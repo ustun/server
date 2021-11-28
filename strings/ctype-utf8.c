@@ -5793,7 +5793,7 @@ struct charset_info_st my_charset_utf8mb3_general_ci=
     0xFFFF,             /* max_sort_char */
     ' ',                /* pad char      */
     0,                  /* escape_with_backslash_is_dangerous */
-    1,                  /* levels_for_order   */
+    MY_CS_COLL_LEVELS_S1,
     &my_charset_utf8mb3_handler,
     &my_collation_utf8mb3_general_ci_handler
 };
@@ -5826,7 +5826,7 @@ struct charset_info_st my_charset_utf8mb3_general_mysql500_ci=
   0xFFFF,                                       /* max_sort_char    */
   ' ',                                          /* pad char         */
   0,                          /* escape_with_backslash_is_dangerous */
-  1,                                            /* levels_for_order   */
+  MY_CS_COLL_LEVELS_S1,
   &my_charset_utf8mb3_handler,
   &my_collation_utf8mb3_general_mysql500_ci_handler
 };
@@ -5859,7 +5859,7 @@ struct charset_info_st my_charset_utf8mb3_bin=
     0xFFFF,             /* max_sort_char */
     ' ',                /* pad char      */
     0,                  /* escape_with_backslash_is_dangerous */
-    1,                  /* levels_for_order   */
+    MY_CS_COLL_LEVELS_S1,
     &my_charset_utf8mb3_handler,
     &my_collation_utf8mb3_bin_handler
 };
@@ -5892,7 +5892,7 @@ struct charset_info_st my_charset_utf8mb3_general_nopad_ci=
     0xFFFF,                   /* max_sort_char    */
     ' ',                      /* pad char         */
     0,                        /* escape_with_backslash_is_dangerous */
-    1,                        /* levels_for_order */
+    MY_CS_COLL_LEVELS_S1,
     &my_charset_utf8mb3_handler,
     &my_collation_utf8mb3_general_nopad_ci_handler
 };
@@ -5925,7 +5925,7 @@ struct charset_info_st my_charset_utf8mb3_nopad_bin=
     0xFFFF,             /* max_sort_char    */
     ' ',                /* pad char         */
     0,                  /* escape_with_backslash_is_dangerous */
-    1,                  /* levels_for_order */
+    MY_CS_COLL_LEVELS_S1,
     &my_charset_utf8mb3_handler,
     &my_collation_utf8mb3_nopad_bin_handler
 };
@@ -6090,7 +6090,7 @@ struct charset_info_st my_charset_utf8mb3_general_cs=
     255,		/* max_sort_char */
     ' ',                /* pad char      */
     0,                  /* escape_with_backslash_is_dangerous */
-    1,                  /* levels_for_order   */
+    MY_CS_COLL_LEVELS_S1,
     &my_charset_utf8mb3_handler,
     &my_collation_cs_handler
 };
@@ -7446,7 +7446,7 @@ struct charset_info_st my_charset_filename=
     0xFFFF,             /* max_sort_char */
     ' ',                /* pad char      */
     0,                  /* escape_with_backslash_is_dangerous */
-    1,                  /* levels_for_order   */
+    MY_CS_COLL_LEVELS_S1,
     &my_charset_filename_handler,
     &my_collation_filename_handler
 };
@@ -8151,7 +8151,7 @@ struct charset_info_st my_charset_utf8mb4_general_ci=
   0xFFFF,             /* max_sort_char */
   ' ',                /* pad char      */
   0,                  /* escape_with_backslash_is_dangerous */
-  1,                  /* levels_for_order   */
+  MY_CS_COLL_LEVELS_S1,
   &my_charset_utf8mb4_handler,
   &my_collation_utf8mb4_general_ci_handler
 };
@@ -8185,7 +8185,7 @@ struct charset_info_st my_charset_utf8mb4_bin=
   0xFFFF,             /* max_sort_char */
   ' ',                /* pad char      */
   0,                  /* escape_with_backslash_is_dangerous */
-  1,                  /* levels_for_order   */
+  MY_CS_COLL_LEVELS_S1,
   &my_charset_utf8mb4_handler,
   &my_collation_utf8mb4_bin_handler
 };
@@ -8219,7 +8219,7 @@ struct charset_info_st my_charset_utf8mb4_general_nopad_ci=
   0xFFFF,             /* max_sort_char    */
   ' ',                /* pad char         */
   0,                  /* escape_with_backslash_is_dangerous */
-  1,                  /* levels_for_order */
+  MY_CS_COLL_LEVELS_S1,
   &my_charset_utf8mb4_handler,
   &my_collation_utf8mb4_general_nopad_ci_handler
 };
@@ -8253,7 +8253,7 @@ struct charset_info_st my_charset_utf8mb4_nopad_bin=
   0xFFFF,             /* max_sort_char    */
   ' ',                /* pad char         */
   0,                  /* escape_with_backslash_is_dangerous */
-  1,                  /* levels_for_order */
+  MY_CS_COLL_LEVELS_S1,
   &my_charset_utf8mb4_handler,
   &my_collation_utf8mb4_nopad_bin_handler
 };

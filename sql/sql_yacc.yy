@@ -1386,6 +1386,7 @@ bool my_yyoverflow(short **a, YYSTYPE **b, size_t *yystacksize);
         attribute
         attribute_list
         field_def
+        collation_name_explicit_or_context
 
 
 %type <Lex_dyncol_type> opt_dyncol_type dyncol_type
@@ -6314,10 +6315,7 @@ attribute:
             lex->alter_info.flags|= ALTER_ADD_INDEX;
             $$.init();
           }
-        | COLLATE_SYM collation_name
-          {
-            $$.set_collate_explicit($2);
-          }
+        | COLLATE_SYM collation_name_explicit_or_context { $$= $2; }
         | serial_attribute { $$.init(); }
         ;
 
@@ -6462,6 +6460,15 @@ collation_name:
           }
         ;
 
+collation_name_explicit_or_context:
+          ident_or_text
+          {
+            $$= Lex_collation_st::get_by_name($1.str, thd->get_utf8_flag());
+            if (unlikely(!$$.collation()))
+              MYSQL_YYABORT;
+          }
+        ;
+
 opt_collate_or_default:
           /* empty */ { $$=NULL; }
         | COLLATE_SYM collation_name_or_default { $$=$2; }
@@ -6510,12 +6517,13 @@ binary:
           {
             $$.set_charset_collate_default($1);
           }
-        | charset_or_alias COLLATE_SYM collation_name
+        | charset_or_alias COLLATE_SYM collation_name_explicit_or_context
           {
-            if ($$.set_charset_collate_explicit($1, $3))
+            $$= Lex_collation($1, Lex_collation::TYPE_IMPLICIT);
+            if ($$.merge_charset_clause_and_collate_clause($3))
               MYSQL_YYABORT;
           }
-        | COLLATE_SYM collation_name  { $$.set_collate_explicit($2); }
+        | COLLATE_SYM collation_name_explicit_or_context { $$= $2; }
         | COLLATE_SYM DEFAULT         { $$.set_collate_default(); }
         ;
 

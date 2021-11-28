@@ -11860,6 +11860,32 @@ CHARSET_INFO *Lex_collation_st::find_default_collation(CHARSET_INFO *cs)
 
 
 /*
+  Take the suffix of the current collation:
+    utf8mb4_uca1400_cs_ci - > uca1400_cs_ci
+  and find the collation with the same name in
+  the character set pointed by "cs".
+*/
+CHARSET_INFO *
+Lex_collation_st::find_contextually_typed_collation(
+                                     CHARSET_INFO *cs,
+                                     const LEX_CSTRING &context_cl_name) const
+{
+  CHARSET_INFO *cl;
+  char tmp[128];
+  my_snprintf(tmp, sizeof(tmp), "%s_%s", cs->cs_name.str, context_cl_name);
+  MY_CHARSET_LOADER loader;
+  my_charset_loader_init_mysys(&loader);
+  if (!(cl= my_collation_get_by_name(&loader, tmp, 0)))
+  {
+    my_error(ER_COLLATION_CHARSET_MISMATCH, MYF(0),
+             context_cl_name.str, cs->cs_name.str);
+    return NULL;
+  }
+  return cl;
+}
+
+
+/*
   Resolve an empty or a contextually typed collation according to the
   upper level default character set (and optionally a collation), e.g.:
     CREATE TABLE t1 (a CHAR(10)) CHARACTER SET latin1;
@@ -11890,10 +11916,13 @@ Lex_collation_st::resolved_to_character_set(CHARSET_INFO *def) const
   if (m_collation == &my_charset_latin1) // CHAR(10) COLLATE DEFAULT
     return find_default_collation(def);
 
+  const LEX_CSTRING context_name= collation_name_suffix();
+  if (!strncasecmp(context_name.str, STRING_WITH_LEN("uca1400_")))
+    return find_contextually_typed_collation(def, context_name);
+
   /*
-    Non-binary and non-default contextually typed collation.
+    Non-binary, non-default, non-uca1400 contextually typed collation.
     We don't have such yet - the parser cannot produce this.
-    But will have soon, e.g. "uca1400_as_ci".
   */
   DBUG_ASSERT(0);
   return NULL;
@@ -11968,8 +11997,21 @@ bool Lex_collation_st::
     /*
       EXPLICIT + CONTEXT
       CHAR(10) COLLATE latin1_bin .. COLLATE DEFAULT       - not supported
-      CHAR(10) COLLATE latin1_bin .. COLLATE uca1400_as_ci - not yet
+      CHAR(10) COLLATE latin1_bin .. COLLATE uca1400_as_ci
     */
+
+    const LEX_CSTRING context_cl_name= cl.collation_name_suffix();
+    if (!strncasecmp(context_cl_name.str, STRING_WITH_LEN("uca1400_")))
+    {
+      CHARSET_INFO *tmp= cl.find_contextually_typed_collation(collation(),
+                                                              context_cl_name);
+      if (!tmp)
+        return true;
+      m_type= TYPE_EXPLICIT;
+      m_collation= tmp;
+      return false;
+    }
+
     DBUG_ASSERT(0); // Not possible yet
     return false;
   }
@@ -12007,12 +12049,6 @@ bool Lex_collation_st::
 bool Lex_collation_st::
        merge_collate_clause_and_collate_clause(const Lex_collation_st &cl)
 {
-  /*
-    We don't have contextually typed independent COLLATE clauses yet.
-    But we'll have soon: COLLATE uca1400_as_ci.
-  */
-  DBUG_ASSERT(!is_contextually_typed_collation());
-  DBUG_ASSERT(!cl.is_contextually_typed_collation());
 
   if (!cl.collation())
     return false;
@@ -12024,17 +12060,92 @@ bool Lex_collation_st::
   }
 
   /*
-    Two independent explicit collations:
+    Two independent explicit or context collations:
       CHAR(10) NOT NULL COLLATE latin1_bin DEFAULT 'a' COLLATE latin1_bin
     Note, we should perhaps eventually disallow double COLLATE clauses.
     But for now let's just disallow only conflicting ones.
   */
-  if (collation() != cl.collation())
+
+  if (type() == cl.type())
+  {
+    /*
+      CONTEXT + CONTEXT
+        CHAR(10) NOT NULL COLLATE uca1400_as_ci
+               DEFAULT '' COLLATE uca1400_as_ci
+
+      EXPLICIT + EXPLICIT
+        CHAR(10) NOT NULL COLLATE utf8mb4_bin
+               DEFAULT '' COLLATE utf8mb4_bin
+    */
+    if (collation() != cl.collation())
+    {
+      my_error(ER_CONFLICTING_DECLARATIONS, MYF(0),
+               "COLLATE ", name_for_error().str,
+               "COLLATE ", cl.name_for_error().str);
+      return true;
+    }
+    return false;
+  }
+
+  /*
+    CONTEXT + EXPLICIT
+      CHAR(10) NOT NULL   COLLATE uca1400_as_ci
+               DEFAULT '' COLLATE utf8mb4_uca140_as_ci;
+
+    EXPLICIT + CONTEXT
+      CHAR(10) NOT NULL   COLLATE utf8mb4_uca1400_as_ci
+               DEFAULT '' COLLATE uca140_as_ci;
+  */
+  const LEX_CSTRING a= collation_name_suffix();
+  const LEX_CSTRING b= cl.collation_name_suffix();
+
+  if (!lex_string_eq(&a, &b))
   {
     my_error(ER_CONFLICTING_DECLARATIONS, MYF(0),
-             "COLLATE ", collation()->coll_name.str,
-             "COLLATE ", cl.collation()->coll_name.str);
+             "COLLATE ", name_for_error().str,
+             "COLLATE ", cl.name_for_error().str);
     return true;
   }
+  if (is_contextually_typed_collation())
+    *this= cl;
   return false;
+}
+
+
+/**
+  Get an explicit or a contextually typed collation by name,
+  send error to client on failure.
+
+  @param name     Collation name
+  @param name_cs  Character set of the name string
+  @return
+  @retval         NULL on error
+  @retval         Pointter to CHARSET_INFO with the given name on success
+*/
+Lex_collation_st Lex_collation_st::get_by_name(const char *name,
+                                               myf utf8_flag)
+{
+  CHARSET_INFO *cs;
+  MY_CHARSET_LOADER loader;
+  my_charset_loader_init_mysys(&loader);
+
+  if (!strncasecmp(name, STRING_WITH_LEN("uca1400_")))
+  {
+    char tmp[128];
+    my_snprintf(tmp, sizeof(tmp), "utf8mb4_%s", name);
+    if ((cs= my_collation_get_by_name(&loader, tmp, MYF(utf8_flag))))
+      return Lex_collation(cs, TYPE_CONTEXTUALLY_TYPED);
+  }
+
+  if (!(cs= my_collation_get_by_name(&loader, name, MYF(utf8_flag))))
+  {
+    ErrConvString err(name, system_charset_info);
+    my_error(ER_UNKNOWN_COLLATION, MYF(0), err.ptr());
+    if (loader.error[0])
+      push_warning_printf(current_thd,
+                          Sql_condition::WARN_LEVEL_WARN,
+                          ER_UNKNOWN_COLLATION, "%s", loader.error);
+    return Lex_collation(NULL, TYPE_IMPLICIT);
+  }
+  return Lex_collation(cs, TYPE_EXPLICIT);
 }

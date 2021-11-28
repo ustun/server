@@ -641,7 +641,13 @@ protected:
   Type m_type;
   static CHARSET_INFO *find_bin_collation(CHARSET_INFO *cs);
   static CHARSET_INFO *find_default_collation(CHARSET_INFO *cs);
+  CHARSET_INFO *find_contextually_typed_collation(
+                                   CHARSET_INFO *cs,
+                                   const LEX_CSTRING &context_name) const;
 public:
+
+  static Lex_collation_st get_by_name(const char *name, myf utf8_flag);
+
   void init()
   {
     m_collation= NULL;
@@ -703,6 +709,26 @@ public:
   bool is_contextually_typed_collation() const
   {
     return m_type == TYPE_CONTEXTUALLY_TYPED;
+  }
+  /*
+    Skip the character set prefix, return the suffix.
+      utf8mb4_uca1400_as_ci -> uca1400_as_ci
+  */
+  LEX_CSTRING collation_name_suffix() const
+  {
+    if (m_collation->coll_name.length <= m_collation->cs_name.length ||
+        m_collation->coll_name.str[m_collation->cs_name.length] != '_')
+      return m_collation->coll_name; // COLLATE `binary` ?
+    LEX_CSTRING res;
+    res.str= m_collation->coll_name.str + m_collation->cs_name.length + 1;
+    res.length= m_collation->coll_name.length - m_collation->cs_name.length - 1;
+    return res;
+  }
+  LEX_CSTRING name_for_error() const
+  {
+    return is_contextually_typed_collation() ?
+           collation_name_suffix() :
+           m_collation->coll_name;
   }
   CHARSET_INFO *resolved_to_character_set(CHARSET_INFO *cs) const;
   bool merge_charset_clause_and_collate_clause(const Lex_collation_st &cl);

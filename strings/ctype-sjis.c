@@ -34194,7 +34194,7 @@ struct charset_info_st my_charset_sjis_japanese_ci=
     0xFCFC,		/* max_sort_char */
     ' ',                /* pad char      */
     1,                  /* escape_with_backslash_is_dangerous */
-    1,                  /* levels_for_order   */
+    MY_CS_COLL_LEVELS_S1,
     &my_charset_handler,
     &my_collation_handler_sjis_japanese_ci
 };
@@ -34226,7 +34226,7 @@ struct charset_info_st my_charset_sjis_bin=
     0xFCFC,		/* max_sort_char */
     ' ',                /* pad char      */
     1,                  /* escape_with_backslash_is_dangerous */
-    1,                  /* levels_for_order   */
+    MY_CS_COLL_LEVELS_S1,
     &my_charset_handler,
     &my_collation_handler_sjis_bin
 };
@@ -34259,7 +34259,7 @@ struct charset_info_st my_charset_sjis_japanese_nopad_ci=
     0xFCFC,              /* max_sort_char    */
     ' ',                 /* pad char         */
     1,                   /* escape_with_backslash_is_dangerous */
-    1,                   /* levels_for_order */
+    MY_CS_COLL_LEVELS_S1,
     &my_charset_handler,
     &my_collation_handler_sjis_japanese_nopad_ci
 };
@@ -34291,7 +34291,7 @@ struct charset_info_st my_charset_sjis_nopad_bin=
     0xFCFC,              /* max_sort_char    */
     ' ',                 /* pad char         */
     1,                   /* escape_with_backslash_is_dangerous */
-    1,                   /* levels_for_order */
+    MY_CS_COLL_LEVELS_S1,
     &my_charset_handler,
     &my_collation_handler_sjis_nopad_bin
 };

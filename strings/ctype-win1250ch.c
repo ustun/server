@@ -720,7 +720,7 @@ struct charset_info_st my_charset_cp1250_czech_cs =
   0xFF,                         /* max_sort_char */
   ' ',                          /* pad char      */
   0,                            /* escape_with_backslash_is_dangerous */
-  2,                            /* levels_for_order   */
+  MY_CS_COLL_LEVELS_S2,
   &my_charset_8bit_handler,
   &my_collation_czech_cs_handler
 };

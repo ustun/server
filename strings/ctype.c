@@ -675,7 +675,10 @@ static int cs_value(MY_XML_PARSER *st,const char *attr, size_t len)
     /* 1, 2, 3, 4, 5, or primary, secondary, tertiary, quaternary, identical */
     rc= tailoring_append(st, "[strength %.*s]", len, attr);
     if (len && attr[0] >= '1' && attr[0] <= '9')
-      i->cs.levels_for_order= attr[0] - '0';
+    {
+      uint strength= attr[0] - '0';
+      my_ci_set_strength(&i->cs, MY_MIN(strength, MY_UCA_WEIGHT_LEVELS));
+    }
     break;
 
   case _CS_ST_ALTERNATE:

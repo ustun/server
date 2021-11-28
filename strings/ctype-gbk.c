@@ -10781,7 +10781,7 @@ struct charset_info_st my_charset_gbk_chinese_ci=
     0xA967,		/* max_sort_char */
     ' ',                /* pad char      */
     1,                  /* escape_with_backslash_is_dangerous */
-    1,                  /* levels_for_order   */
+    MY_CS_COLL_LEVELS_S1,
     &my_charset_handler,
     &my_collation_handler_gbk_chinese_ci
 };
@@ -10813,7 +10813,7 @@ struct charset_info_st my_charset_gbk_bin=
     0xFEFE,		/* max_sort_char */
     ' ',                /* pad char      */
     1,                  /* escape_with_backslash_is_dangerous */
-    1,                  /* levels_for_order   */
+    MY_CS_COLL_LEVELS_S1,
     &my_charset_handler,
     &my_collation_handler_gbk_bin
 };
@@ -10846,7 +10846,7 @@ struct charset_info_st my_charset_gbk_chinese_nopad_ci=
     0xA967,             /* max_sort_char    */
     ' ',                /* pad char         */
     1,                  /* escape_with_backslash_is_dangerous */
-    1,                  /* levels_for_order */
+    MY_CS_COLL_LEVELS_S1,
     &my_charset_handler,
     &my_collation_handler_gbk_chinese_nopad_ci
 };
@@ -10878,7 +10878,7 @@ struct charset_info_st my_charset_gbk_nopad_bin=
     0xFEFE,             /* max_sort_char    */
     ' ',                /* pad char         */
     1,                  /* escape_with_backslash_is_dangerous */
-    1,                  /* levels_for_order */
+    MY_CS_COLL_LEVELS_S1,
     &my_charset_handler,
     &my_collation_handler_gbk_nopad_bin
 };

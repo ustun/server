@@ -652,7 +652,7 @@ struct charset_info_st my_charset_latin2_czech_cs =
     0xAE,               /* max_sort_char */
     ' ',                /* pad char      */
     0,                  /* escape_with_backslash_is_dangerous */
-    4,                  /* levels_for_order   */
+    MY_CS_COLL_LEVELS_S4,
     &my_charset_8bit_handler,
     &my_collation_latin2_czech_cs_handler
 };
