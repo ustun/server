@@ -9,6 +9,7 @@ RESET MASTER;
 # MDEV-27365 CREATE-or-REPLACE SEQUENCE bilogged without DDL flag
 # Prove it is logged with the DDL flag.
 CREATE OR REPLACE SEQUENCE s1;
+CREATE OR REPLACE SEQUENCE s1;
 
 # This one has been always correct.
 DROP SEQUENCE s1;

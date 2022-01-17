@@ -1718,10 +1718,10 @@ struct THD_TRANS
   */
   bool modified_non_trans_table;
 
-  void reset() {
+  void reset(uint unsafe_flags_arg= 0) {
     no_2pc= FALSE;
     modified_non_trans_table= FALSE;
-    m_unsafe_rollback_flags= 0;
+    m_unsafe_rollback_flags= unsafe_flags_arg;
   }
   bool is_empty() const { return ha_list == NULL; }
   THD_TRANS() {}                        /* Remove gcc warning */

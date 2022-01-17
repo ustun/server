@@ -331,14 +331,18 @@ bool trans_commit(THD *thd)
   @note A implicit commit does not releases existing table locks.
 
   @param thd     Current thread
-
+  @param save_restore
+                 Requests the transaction context's unsafe flag to survive
+                 the trx' reset.
   @retval FALSE  Success
   @retval TRUE   Failure
 */
 
-bool trans_commit_implicit(THD *thd)
+bool trans_commit_implicit(THD *thd, bool save_restore)
 {
   bool res= FALSE;
+  uint save_unsafe_rollback_flags= !save_restore ? 0 :
+    thd->transaction.all.m_unsafe_rollback_flags;
   DBUG_ENTER("trans_commit_implicit");
 
   if (trans_check(thd))
@@ -365,7 +369,7 @@ bool trans_commit_implicit(THD *thd)
   }
 
   thd->variables.option_bits&= ~(OPTION_BEGIN | OPTION_KEEP_LOG);
-  thd->transaction.all.reset();
+  thd->transaction.all.reset(save_unsafe_rollback_flags);
 
   /*
     Upon implicit commit, reset the current transaction
