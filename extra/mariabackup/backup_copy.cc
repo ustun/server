@@ -582,7 +582,6 @@ datafile_read(datafile_cur_t *cursor)
 Check to see if a file exists.
 Takes name of the file to check.
 @return true if file exists. */
-static
 bool
 file_exists(const char *filename)
 {
@@ -1547,13 +1546,14 @@ bool backup_start(CorruptedPages &corrupted_pages)
 		if (!write_galera_info(mysql_connection)) {
 			return(false);
 		}
-		write_current_binlog_file(mysql_connection);
 	}
 
-	if (opt_binlog_info == BINLOG_INFO_ON) {
+	bool with_binlogs = opt_binlog_info == BINLOG_INFO_ON;
 
-		lock_binlog_maybe(mysql_connection);
-		write_binlog_info(mysql_connection);
+	if (with_binlogs || opt_galera_info) {
+		if (!write_current_binlog_file(mysql_connection, with_binlogs)) {
+			return(false);
+		}
 	}
 
 	if (have_flush_engine_logs && !opt_no_lock) {

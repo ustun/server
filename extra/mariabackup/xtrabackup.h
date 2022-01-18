@@ -164,6 +164,7 @@ extern uint		opt_lock_wait_timeout;
 extern uint		opt_lock_wait_threshold;
 extern uint		opt_debug_sleep_before_unlock;
 extern uint		opt_safe_slave_backup_timeout;
+extern uint		opt_max_binlogs;
 
 extern const char	*opt_history;
 

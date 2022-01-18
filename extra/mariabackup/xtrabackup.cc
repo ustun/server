@@ -347,6 +347,7 @@ uint opt_lock_wait_timeout = 0;
 uint opt_lock_wait_threshold = 0;
 uint opt_debug_sleep_before_unlock = 0;
 uint opt_safe_slave_backup_timeout = 0;
+uint opt_max_binlogs = UINT_MAX;
 
 const char *opt_history = NULL;
 
@@ -1051,7 +1052,8 @@ enum options_xtrabackup
   OPT_BACKUP_ROCKSDB,
   OPT_XTRA_CHECK_PRIVILEGES,
   OPT_XB_IGNORE_INNODB_PAGE_CORRUPTION,
-  OPT_INNODB_FORCE_RECOVERY
+  OPT_INNODB_FORCE_RECOVERY,
+  OPT_MAX_BINLOGS
 };
 
 struct my_option xb_client_options[]= {
@@ -1453,6 +1455,12 @@ struct my_option xb_client_options[]= {
      "corrupted pages and can not be considered as consistent.",
      &opt_log_innodb_page_corruption, &opt_log_innodb_page_corruption, 0,
      GET_BOOL, NO_ARG, 0, 0, 0, 0, 0, 0},
+
+    {"sst_max_binlogs", OPT_MAX_BINLOGS,
+     "Number of recent binary logs to be included in the backup",
+     (G_PTR *) &opt_max_binlogs,
+     (G_PTR *) &opt_max_binlogs, 0, GET_UINT, OPT_ARG,
+     UINT_MAX, 0, UINT_MAX, 0, 1, 0},
 
 #define MYSQL_CLIENT
 #include "sslopt-longopts.h"
