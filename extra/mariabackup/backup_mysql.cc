@@ -1336,7 +1336,8 @@ cleanup:
 static
 bool
 write_binlog_info(MYSQL *connection, char *log_bin_dir,
-		  MYSQL_RES *mysql_result, my_ulonglong start);
+		  MYSQL_RES *mysql_result, my_ulonglong n_rows,
+		  my_ulonglong start);
 
 /*********************************************************************//**
 Flush and copy the current binary log file into the backup,
@@ -1344,6 +1345,7 @@ if GTID is enabled */
 bool
 write_current_binlog_file(MYSQL *connection, bool write_binlogs)
 {
+	char *log_bin = NULL;
 	char *filename = NULL;
 	char *position = NULL;
 	char *executed_gtid_set = NULL;
@@ -1351,6 +1353,11 @@ write_current_binlog_file(MYSQL *connection, bool write_binlogs)
 	char *log_bin_dir = NULL;
 	bool gtid_exists;
 	bool result = true;
+
+	mysql_variable log_bin_var[] = {
+		{"@@GLOBAL.log_bin", &log_bin},
+		{NULL, NULL}
+	};
 
 	mysql_variable vars[] = {
 		{"gtid_binlog_state", &gtid_binlog_state},
@@ -1365,12 +1372,21 @@ write_current_binlog_file(MYSQL *connection, bool write_binlogs)
 		{NULL, NULL}
 	};
 
+	read_mysql_variables(connection, "SELECT @@GLOBAL.log_bin", log_bin_var, false);
+
+	/* Do not create xtrabackup_binlog_info if binary log is disabled: */
+	if (strcmp(log_bin, "1") != 0) {
+		goto binlog_disabled;
+	}
+
+	lock_binlog_maybe(connection);
+
 	read_mysql_variables(connection, "SHOW MASTER STATUS", status, false);
 
+	/* Do not create xtrabackup_binlog_info if replication
+	has not started yet: */
 	if (filename == NULL || position == NULL) {
-		/* Do not create xtrabackup_binlog_info if binary
-		log is disabled */
-		goto binlog_disabled;
+		goto no_replication;
 	}
 
 	read_mysql_variables(connection, "SHOW VARIABLES", vars, true);
@@ -1379,22 +1395,6 @@ write_current_binlog_file(MYSQL *connection, bool write_binlogs)
 			|| (gtid_binlog_state && *gtid_binlog_state);
 
 	if (write_binlogs || gtid_exists) {
-
-		char *log_bin_file = NULL;
-
-		mysql_variable status_after_flush[] = {
-			{"File", &log_bin_file},
-			{NULL, NULL}
-		};
-
-		size_t log_bin_dir_length;
-
-		lock_binlog_maybe(connection);
-
-		xb_mysql_query(connection, "FLUSH BINARY LOGS", false);
-
-		read_mysql_variables(connection, "SHOW MASTER STATUS",
-			status_after_flush, false);
 
 		if (opt_log_bin != NULL && strchr(opt_log_bin, FN_LIBCHAR)) {
 			/* If log_bin is set, it has priority */
@@ -1407,6 +1407,8 @@ write_current_binlog_file(MYSQL *connection, bool write_binlogs)
 			log_bin_dir = strdup("./");
 		}
 
+		size_t log_bin_dir_length;
+
 		dirname_part(log_bin_dir, log_bin_dir, &log_bin_dir_length);
 
 		/* strip final slash if it is not the only path component */
@@ -1415,9 +1417,8 @@ write_current_binlog_file(MYSQL *connection, bool write_binlogs)
 			log_bin_dir[log_bin_dir_length - 1] = 0;
 		}
 
-		if (log_bin_dir == NULL || log_bin_file == NULL) {
-			msg("Failed to get master binlog coordinates from "
-				"SHOW MASTER STATUS");
+		if (log_bin_dir == NULL) {
+			msg("Failed to locate binary log files");
 			result = false;
 			goto cleanup;
 		}
@@ -1431,6 +1432,8 @@ write_current_binlog_file(MYSQL *connection, bool write_binlogs)
 				goto cleanup;
 			}
 		}
+
+		xb_mysql_query(connection, "FLUSH BINARY LOGS", false);
 
 		MYSQL_RES *mysql_result;
 
@@ -1454,9 +1457,6 @@ write_current_binlog_file(MYSQL *connection, bool write_binlogs)
 		MYSQL_ROW row;
 		while ((row = mysql_fetch_row(mysql_result))) {
 			const char *binlog_name = row[0];
-			if (strcmp(binlog_name, log_bin_file) == 0) {
-				continue;
-			}
 			char filepath[FN_REFLEN];
 			snprintf(filepath, sizeof(filepath), "%s%c%s",
 				 log_bin_dir, FN_LIBCHAR, binlog_name);
@@ -1467,28 +1467,21 @@ write_current_binlog_file(MYSQL *connection, bool write_binlogs)
 		}
 
 		if (result) {
-			char filepath[FN_REFLEN];
-			snprintf(filepath, sizeof(filepath), "%s%c%s",
-				 log_bin_dir, FN_LIBCHAR, log_bin_file);
-			if (file_exists(filepath)) {
-				result = copy_file(ds_data, filepath, log_bin_file, 0);
-			}
-		}
-
-		if (result) {
-			write_binlog_info(connection, log_bin_dir, mysql_result, start);
+			write_binlog_info(connection, log_bin_dir,
+					  mysql_result, n_rows, start);
 		}
 
 		mysql_free_result(mysql_result);
-cleanup:
-		free_mysql_variables(status_after_flush);
-
 	}
 
+cleanup:
 	free_mysql_variables(vars);
 
-binlog_disabled:
+no_replication:
 	free_mysql_variables(status);
+
+binlog_disabled:
+	free_mysql_variables(log_bin_var);
 
 	return(result);
 }
@@ -1500,7 +1493,8 @@ saves it in a file. It also prints it to stdout. */
 static
 bool
 write_binlog_info(MYSQL *connection, char *log_bin_dir,
-		  MYSQL_RES *mysql_result, my_ulonglong start)
+		  MYSQL_RES *mysql_result, my_ulonglong n_rows,
+		  my_ulonglong start)
 {
 	char *filename = NULL;
 	char *position = NULL;
@@ -1511,7 +1505,6 @@ write_binlog_info(MYSQL *connection, char *log_bin_dir,
 	char *buffer;
 	char *buf;
 	int total;
-	int position_length;
 	bool result = true;
 	bool mysql_gtid;
 	bool mariadb_gtid;
@@ -1531,13 +1524,6 @@ write_binlog_info(MYSQL *connection, char *log_bin_dir,
 	};
 
 	read_mysql_variables(connection, "SHOW MASTER STATUS", status, false);
-
-	if (filename == NULL || position == NULL) {
-		/* Do not create xtrabackup_binlog_info if binary
-		log is disabled */
-		goto cleanup;
-	}
-
 	read_mysql_variables(connection, "SHOW VARIABLES", vars, true);
 
 	mysql_gtid = gtid_mode && (strcmp(gtid_mode, "ON") == 0);
@@ -1559,46 +1545,61 @@ write_binlog_info(MYSQL *connection, char *log_bin_dir,
 
 	mysql_data_seek(mysql_result, start);
 
-	position_length = strlen(position) + 2;
-	if (with_gtid) {
-		position_length += strlen(gtid) + 1;
-	}
-
-	total = strlen(filename) + position_length + 1;
-
 	MYSQL_ROW row;
+	my_ulonglong current;
+
+	total = 1;
+	current = start;
 	while ((row = mysql_fetch_row(mysql_result))) {
 		const char *binlog_name = row[0];
-		if (strcmp(binlog_name, filename) == 0) {
-			continue;
+		/* The position in the current binlog is taken from
+		the global variable, but for the previous ones it is
+		determined by their length: */
+		const char *binlog_pos =
+			++current == n_rows ? position : row[1];
+		total += strlen(binlog_name) + strlen(binlog_pos) + 2;
+		if (with_gtid && current != n_rows) {
+			/* Add the "\t[]" length to the buffer size: */
+			total += 3;
 		}
-		total += strlen(binlog_name) + position_length;
+	}
+	/* For the last of the binray log files, also add
+	the length of the GTID (+ one character for '\t'): */
+	if (with_gtid) {
+		total += strlen(gtid) + 1;
 	}
 
 	buffer = static_cast<char*>(malloc(total));
 	if (!buffer) {
 		msg("Failed to allocate memory for temporary buffer");
 		result = false;
-		goto cleanup2;
+		goto cleanup;
 	}
 
 	mysql_data_seek(mysql_result, start);
 
 	buf = buffer;
+	current = start;
 	while ((row = mysql_fetch_row(mysql_result))) {
 		const char *binlog_name = row[0];
-		if (strcmp(binlog_name, filename) == 0) {
-			continue;
-		}
 		char filepath[FN_REFLEN];
 		snprintf(filepath, sizeof(filepath), "%s%c%s",
 			 log_bin_dir, FN_LIBCHAR, binlog_name);
+		current++;
 		if (file_exists(filepath)) {
+			/* The position in the current binlog is taken from
+			the global variable, but for the previous ones it is
+			determined by their length: */
+			char *binlog_pos =
+				current == n_rows ? position : row[1];
 			int bytes;
 			if (with_gtid) {
-				bytes = snprintf(buf, total, "%s\t%s\t%s\n", binlog_name, position, gtid);
+				bytes = snprintf(buf, total, "%s\t%s\t%s\n",
+						 binlog_name, binlog_pos,
+						 current == n_rows ? gtid : "[]");
 			} else {
-				bytes = snprintf(buf, total, "%s\t%s\n", binlog_name, position);
+				bytes = snprintf(buf, total, "%s\t%s\n",
+						 binlog_name, binlog_pos);
 			}
 			if (bytes <= 0) {
 				goto buffer_overflow;
@@ -1607,41 +1608,24 @@ write_binlog_info(MYSQL *connection, char *log_bin_dir,
 			total -= bytes;
 		}
 	}
-	{
-		char filepath[FN_REFLEN];
-		snprintf(filepath, sizeof(filepath), "%s%c%s",
-			 log_bin_dir, FN_LIBCHAR, filename);
-		if (file_exists(filepath)) {
-			int bytes;
-			if (with_gtid) {
-				bytes = snprintf(buf, total, "%s\t%s\t%s\n", filename, position, gtid);
-			} else {
-				bytes = snprintf(buf, total, "%s\t%s\n", filename, position);
-			}
-			if (bytes <= 0) {
-				goto buffer_overflow;
-			}
-			buf += bytes;
-		}
-	}
 
 	if (buf != buffer) {
 		result = backup_file_printf(XTRABACKUP_BINLOG_INFO, "%s", buffer);
 	}
 
-cleanup3:
-	free(buffer);
 cleanup2:
-	free_mysql_variables(vars);
+	free(buffer);
+
 cleanup:
+	free_mysql_variables(vars);
 	free_mysql_variables(status);
 
 	return(result);
 
 buffer_overflow:
-	msg("Buffer overflow in write_binlog_info");
+	msg("Internal error: buffer overflow in the write_binlog_info()");
 	result = false;
-	goto cleanup3;
+	goto cleanup2;
 }
 
 struct escape_and_quote

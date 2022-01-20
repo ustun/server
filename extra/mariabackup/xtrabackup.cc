@@ -1457,7 +1457,12 @@ struct my_option xb_client_options[]= {
      GET_BOOL, NO_ARG, 0, 0, 0, 0, 0, 0},
 
     {"sst_max_binlogs", OPT_MAX_BINLOGS,
-     "Number of recent binary logs to be included in the backup",
+     "Number of recent binary logs to be included in the backup. "
+     "Setting this parameter to zero normally disables transmission "
+     "of binary logs to the joiner nodes during SST using Galera. "
+     "But sometimes a single current binlog can still be transmitted "
+     "to the joiner even with sst_max_binlogs=0, because it is "
+     "required for Galera to work properly with GTIDs support.",
      (G_PTR *) &opt_max_binlogs,
      (G_PTR *) &opt_max_binlogs, 0, GET_UINT, OPT_ARG,
      UINT_MAX, 0, UINT_MAX, 0, 1, 0},
