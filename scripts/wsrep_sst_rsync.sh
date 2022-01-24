@@ -307,8 +307,7 @@ fi
 
 readonly SECRET_TAG='secret'
 
-if [ "$WSREP_SST_OPT_ROLE" = 'donor' ]
-then
+if [ "$WSREP_SST_OPT_ROLE" = 'donor' ]; then
 
     [ -f "$MAGIC_FILE"      ] && rm -f "$MAGIC_FILE"
     [ -f "$BINLOG_TAR_FILE" ] && rm -f "$BINLOG_TAR_FILE"
@@ -372,12 +371,6 @@ EOF
         if [ -n "$WSREP_SST_OPT_BINLOG" ]; then
             # Change the directory to binlog base (if possible):
             cd "$DATA"
-            if [ -n "$binlog_dir" -a \
-                    "$binlog_dir" != '.' -a \
-                 -d "$binlog_dir" ]
-            then
-                cd "$binlog_dir"
-            fi
             # Let's check the existence of the file with the index:
             if [ -f "$WSREP_SST_OPT_BINLOG_INDEX" ]; then
                 # Let's read the binlog index:
@@ -418,7 +411,7 @@ EOF
                                 fi
                                 eval tar $tar_options \
                                          -cvf "'$BINLOG_TAR_FILE'" $binlogs >&2
-                           fi
+                            fi
                         }
                     else
                         tar_options='-cvf'
@@ -734,11 +727,10 @@ EOF
         TRANSFER_PID="$STUNNEL_PID"
     fi
 
-    if [ "${SSLMODE#VERIFY}" != "$SSLMODE" ]
-    then # backward-incompatible behavior
+    if [ "${SSLMODE#VERIFY}" != "$SSLMODE" ]; then
+        # backward-incompatible behavior
         CN=""
-        if [ -n "$SSTCERT" ]
-        then
+        if [ -n "$SSTCERT" ]; then
             # find out my Common Name
             get_openssl
             if [ -z "$OPENSSL_BINARY" ]; then
@@ -809,35 +801,28 @@ EOF
         # among the transferred files, then we need to remove the
         # old binlogs:
         if [ $WSREP_SST_OPT_BYPASS -eq 0 -o $binlog_tar_present -ne 0 ]; then
-            # Change the directory to binlog base (if possible):
             cd "$DATA"
+            # Clean up the old binlog files and index:
+            binlog_index="$WSREP_SST_OPT_BINLOG_INDEX"
+            if [ -f "$binlog_index" ]; then
+                while read bin_file || [ -n "$bin_file" ]; do
+                    rm -f "$bin_file" || :
+                done < "$binlog_index"
+                rm -f "$binlog_index"
+            fi
             binlog_cd=0
-            if [ -n "$binlog_dir" -a \
-                    "$binlog_dir" != '.' -a \
+            # Change the directory to binlog base (if possible):
+            if [ -n "$binlog_dir" -a "$binlog_dir" != '.' -a \
                  -d "$binlog_dir" ]
             then
                 binlog_cd=1
                 cd "$binlog_dir"
             fi
-            binlog_index="$WSREP_SST_OPT_BINLOG_INDEX"
-            # Clean up old binlog files first:
-            if [ -f "$binlog_index" ]; then
-                binlogs=$(cat "$binlog_index")
-                rm -f "$binlog_index"
-                if [ $binlog_cd -ne 0 ]; then
-                    cd "$DATA_DIR"
-                fi
-                echo "$binlogs" | \
-                while read bin_file || [ -n "$bin_file" ]; do
-                    rm -f "$bin_file" || :
-                done
-            else
-                rm -f "$binlog_base".[0-9]* || :
-            fi
-            cd "$OLD_PWD"
+            # Clean up unindexed binlog files:
+            rm -f "$binlog_base".[0-9]* || :
+            [ $binlog_cd -ne 0 ] && cd "$DATA_DIR"
         fi
         if [ $binlog_tar_present -ne 0 ]; then
-            cd "$DATA"
             # Create a temporary file:
             tmpdir=$(parse_cnf '--mysqld|sst' 'tmpdir')
             if [ -z "$tmpdir" ]; then
@@ -847,23 +832,27 @@ EOF
             else
                tmpfile=$(TMPDIR="$tmpdir"; mktemp '-d')
             fi
+            if [ -n "$binlog_dir" -a "$binlog_dir" != '.' ]; then
+                [ ! -d "$binlog_dir" ] && mkdir -p "$binlog_dir"
+            fi
+            index_dir=$(dirname "$binlog_index");
+            if [ -n "$index_dir" -a "$index_dir" != '.' ]; then
+                [ ! -d "$index_dir" ] && mkdir -p "$index_dir"
+            fi
             # Extracting binlog files:
             wsrep_log_info "Extracting binlog files:"
+            cd "$binlog_dir"
             if ! tar -xvf "$BINLOG_TAR_FILE" > "$tmpfile"; then
                 rm -f "$tmpfile"
                 wsrep_log_error "Error unpacking tar file with binlog files"
                 exit 32
             fi
-            binlogs=$(cat "$tmpfile")
-            rm -f "$tmpfile"
             # Rebuild binlog index:
-            if [ $binlog_cd -ne 0 ]; then
-                cd "$binlog_dir"
-            fi
-            echo "$binlogs" | \
+            cd "$DATA_DIR"
             while read bin_file || [ -n "$bin_file" ]; do
                 echo "$binlog_dir${binlog_dir:+/}$bin_file" >> "$binlog_index"
-            done
+            done < "$tmpfile"
+            rm -f "$tmpfile"
             cd "$OLD_PWD"
         fi
     fi

@@ -61,6 +61,23 @@ trim_dir()
     fi
 }
 
+to_minuses()
+{
+    local x="$1"
+    local t="${1#*_}"
+    local r=""
+    while [ "$t" != "$x" ]; do
+       r="$r${x%%_*}-"
+       x="$t"
+       t="${t#*_}"
+    done
+    if [ -n "$BASH_VERSION" ]; then
+        printf '%s' "$r$x"
+    else
+        echo "$r$x"
+    fi
+}
+
 WSREP_SST_OPT_BYPASS=0
 WSREP_SST_OPT_BINLOG=""
 WSREP_SST_OPT_BINLOG_INDEX=""
@@ -409,6 +426,11 @@ case "$1" in
            # that has a "long" name, so remove all characters after
            # the first equal sign:
            option="${1%%=*}"
+           # If the option name contains underscores, then replace
+           # them to minuses:
+           if [ "${option#*_}" != "$option" ]; then
+               option=$(to_minuses "$option")
+           fi
            # The "--loose-" prefix should not affect the recognition
            # of the option name:
            if [ "${option#--loose-}" != "$option" ]; then
@@ -598,7 +620,7 @@ get_binlog()
         # If the log-bin option is specified without a parameter,
         # then we need to build the name of the index file according
         # to the rules described in the server documentation:
-        if [ $(in_config '--mysqld' 'log-bin') -eq 1 ]; then
+        if [ $(in_config '--mysqld' 'log-bin') -ne 0 ]; then
             if [ -n "$WSREP_SST_OPT_LOG_BASENAME" ]; then
                 # If the WSREP_SST_OPT_BINLOG variable is not set, but
                 # --log-basename is present among the arguments of mysqld,
@@ -1239,13 +1261,6 @@ verify_cert_matches_key()
         exit 22
     fi
 
-    # If the diff utility is not installed, then
-    # we will not do this certificate check:
-    if [ -z "$(commandex diff)" ]; then
-        wsrep_log_info "diff utility not found"
-        return
-    fi
-
     # If the openssl utility is not installed, then
     # we will not do this certificate check:
     get_openssl
@@ -1256,9 +1271,9 @@ verify_cert_matches_key()
 
     # Generate the public key from the cert and the key.
     # They should match (otherwise we can't create an SSL connection).
-    if ! diff <("$OPENSSL_BINARY" x509 -in "$cert" -pubkey -noout 2>/dev/null) \
-              <("$OPENSSL_BINARY" pkey -in "$key" -pubout 2>/dev/null) >/dev/null 2>&1
-    then
+    local pk1=$("$OPENSSL_BINARY" x509 -in "$cert" -pubkey -noout 2>/dev/null || :)
+    local pk2=$("$OPENSSL_BINARY" pkey -in "$key" -pubout 2>/dev/null || :)
+    if [ "$pk1" != "$pk2" ]; then
         wsrep_log_error "******************* FATAL ERROR *****************"
         wsrep_log_error "* The certificate and private key do not match. *"
         wsrep_log_error "* Please check your certificate and key files.  *"

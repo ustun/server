@@ -953,7 +953,7 @@ setup_commands()
         recovery=" --innodb-force-recovery=$INNODB_FORCE_RECOVERY"
     fi
     INNOAPPLY="$BACKUP_BIN$disver$recovery${iapts:+ }$iapts$INNOEXTRA --apply-log${rebuildcmd:+ }$rebuildcmd --datadir='$DATA' '$DATA' $INNOAPPLY"
-    INNOMOVE="$BACKUP_BIN$WSREP_SST_OPT_CONF --move-back$disver${impts:+ }$impts --force-non-empty-directories --datadir='${TDATA:-$DATA}' '$DATA' $INNOMOVE"
+    INNOMOVE="$BACKUP_BIN$WSREP_SST_OPT_CONF --move-back$disver${impts:+ }$impts$INNOEXTRA --force-non-empty-directories --datadir='${TDATA:-$DATA}' '$DATA' $INNOMOVE"
     local sfmt_work="$sfmt"
     if [ "$sfmt" = 'mbstream' ]; then
         sfmt_work='xbstream'
@@ -1278,6 +1278,36 @@ then
         jpid=$!
         wsrep_log_info "Proceeding with SST"
 
+        get_binlog
+
+        if [ -n "$WSREP_SST_OPT_BINLOG" ]; then
+            binlog_dir=$(dirname "$WSREP_SST_OPT_BINLOG")
+            binlog_base=$(basename "$WSREP_SST_OPT_BINLOG")
+            binlog_index="$WSREP_SST_OPT_BINLOG_INDEX"
+            cd "$DATA"
+            wsrep_log_info "Cleaning the old binary logs"
+            # If there is a file with binlogs state, delete it:
+            [ -f "$binlog_base.state" ] && rm -fv "$binlog_base.state" 1>&2
+            # Clean up the old binlog files and index:
+            if [ -f "$binlog_index" ]; then
+                while read bin_file || [ -n "$bin_file" ]; do
+                    rm -fv "$bin_file" 1>&2 || :
+                done < "$binlog_index"
+                rm -fv "$binlog_index" 1>&2
+            fi
+            if [ -n "$binlog_dir" -a "$binlog_dir" != '.' -a \
+                 -d "$binlog_dir" ]
+            then
+                cd "$binlog_dir"
+                if [ "$(pwd -P)" != "$DATA_DIR" ]; then
+                    wsrep_log_info \
+                       "Cleaning the binlog directory '$binlog_dir' as well"
+                fi
+            fi
+            rm -fv "$binlog_base".[0-9]* 1>&2 || :
+            cd "$OLD_PWD"
+        fi
+
         wsrep_log_info \
             "Cleaning the existing datadir and innodb-data/log directories"
         if [ "$OS" = 'FreeBSD' ]; then
@@ -1292,35 +1322,6 @@ then
                  ${ib_log_dir:+"$ib_log_dir"} \
                  "$DATA" -mindepth 1 -prune -regex "$cpat" \
                  -o -exec rm -rfv {} 1>&2 \+
-        fi
-
-        get_binlog
-
-        if [ -n "$WSREP_SST_OPT_BINLOG" ]; then
-            binlog_dir=$(dirname "$WSREP_SST_OPT_BINLOG")
-            binlog_base=$(basename "$WSREP_SST_OPT_BINLOG")
-            binlog_index="$WSREP_SST_OPT_BINLOG_INDEX"
-            binlog_explicit=0
-            if [ -n "$binlog_dir" -a "$binlog_dir" != '.' ]; then
-                binlog_explicit=1
-                if [ -d "$binlog_dir" ]; then
-                    cd "$binlog_dir"
-                    wsrep_log_info \
-                       "Cleaning the binlog directory $binlog_dir as well"
-                    if [ -f "$binlog_index" ]; then
-                        binlogs=$(cat "$binlog_index")
-                        rm -fv "$binlog_index" 1>&2
-                        cd "$DATA_DIR"
-                        echo "$binlogs" | \
-                        while read bin_file || [ -n "$bin_file" ]; do
-                            rm -fv "$bin_file" 1>&2 || :
-                        done
-                    else
-                        rm -fv "$binlog_base".[0-9]* 1>&2 || :
-                    fi
-                fi
-            fi
-            cd "$OLD_PWD"
         fi
 
         TDATA="$DATA"
@@ -1393,7 +1394,17 @@ then
             fi
         fi
 
-        if  [ -n "$WSREP_SST_OPT_BINLOG" ]; then
+        wsrep_log_info "Preparing the backup at $DATA"
+        setup_commands
+        timeit 'Xtrabackup prepare stage' "$INNOAPPLY"
+
+        if [ $? -ne 0 ]; then
+            wsrep_log_error "xtrabackup apply finished with errors." \
+                            "Check syslog or '$INNOAPPLYLOG' for details."
+            exit 22
+        fi
+
+        if [ -n "$WSREP_SST_OPT_BINLOG" ]; then
             cd "$DATA"
             binlogs=""
             if [ -f 'xtrabackup_binlog_info' ]; then
@@ -1407,28 +1418,23 @@ then
             else
                 binlogs=$(ls -d -1 "$binlog_base".[0-9]* 2>/dev/null || :)
             fi
+            cd "$DATA_DIR"
+            if [ -n "$binlog_dir" -a "$binlog_dir" != '.' ]; then
+                [ ! -d "$binlog_dir" ] && mkdir -p "$binlog_dir"
+            fi
+            index_dir=$(dirname "$binlog_index");
+            if [ -n "$index_dir" -a "$index_dir" != '.' ]; then
+                [ ! -d "$index_dir" ] && mkdir -p "$index_dir"
+            fi
             if [ -n "$binlogs" ]; then
-                cd "$DATA_DIR"
-                if [ $binlog_explicit -ne 0 ]; then
-                    [ ! -d "$binlog_dir" ] && mkdir -p "$binlog_dir"
-                    cd "$binlog_dir"
-                fi
+                wsrep_log_info "Moving binary logs to $binlog_dir"
                 echo "$binlogs" | \
                 while read bin_file || [ -n "$bin_file" ]; do
+                    mv "$DATA/$bin_file" "$binlog_dir"
                     echo "$binlog_dir${binlog_dir:+/}$bin_file" >> "$binlog_index"
                 done
             fi
             cd "$OLD_PWD"
-        fi
-
-        wsrep_log_info "Preparing the backup at $DATA"
-        setup_commands
-        timeit 'Xtrabackup prepare stage' "$INNOAPPLY"
-
-        if [ $? -ne 0 ]; then
-            wsrep_log_error "xtrabackup apply finished with errors." \
-                            "Check syslog or '$INNOAPPLYLOG' for details."
-            exit 22
         fi
 
         MAGIC_FILE="$TDATA/$INFO_FILE"
