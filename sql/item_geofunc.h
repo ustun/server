@@ -718,6 +718,7 @@ class Item_func_sphere_distance: public Item_real_func
 {
   double spherical_distance_points(Geometry *g1, Geometry *g2,
                                    const double sphere_r);
+  int check_geometries(const int g1, const int g2);
 public:
   Item_func_sphere_distance(THD *thd, List<Item> &list):
     Item_real_func(thd, list) {}
