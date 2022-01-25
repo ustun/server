@@ -393,9 +393,9 @@ longlong Item_func_json_valid::val_int()
 }
 
 
-bool Item_func_json_equals::fix_length_and_dec()
+bool Item_func_json_equals::fix_length_and_dec(THD *thd)
 {
-  if (Item_bool_func::fix_length_and_dec())
+  if (Item_bool_func::fix_length_and_dec(thd))
     return TRUE;
   set_maybe_null();
   return FALSE;
@@ -453,9 +453,9 @@ end:
 }
 
 
-bool Item_func_json_exists::fix_length_and_dec()
+bool Item_func_json_exists::fix_length_and_dec(THD *thd)
 {
-  if (Item_bool_func::fix_length_and_dec())
+  if (Item_bool_func::fix_length_and_dec(thd))
     return TRUE;
   set_maybe_null();
   path.set_constant_flag(args[1]->const_item());
@@ -506,7 +506,7 @@ err_return:
 }
 
 
-bool Item_func_json_value::fix_length_and_dec()
+bool Item_func_json_value::fix_length_and_dec(THD *thd)
 {
   collation.set(args[0]->collation);
   max_length= args[0]->max_length;
@@ -516,7 +516,7 @@ bool Item_func_json_value::fix_length_and_dec()
 }
 
 
-bool Item_func_json_query::fix_length_and_dec()
+bool Item_func_json_query::fix_length_and_dec(THD *thd)
 {
   collation.set(args[0]->collation);
   max_length= args[0]->max_length;
@@ -628,7 +628,7 @@ bool Json_engine_scan::check_and_get_value_complex(String *res, int *error)
 }
 
 
-bool Item_func_json_quote::fix_length_and_dec()
+bool Item_func_json_quote::fix_length_and_dec(THD *thd)
 {
   collation.set(&my_charset_utf8mb4_bin);
   /*
@@ -664,7 +664,7 @@ String *Item_func_json_quote::val_str(String *str)
 }
 
 
-bool Item_func_json_unquote::fix_length_and_dec()
+bool Item_func_json_unquote::fix_length_and_dec(THD *thd)
 {
   collation.set(&my_charset_utf8mb3_general_ci,
                 DERIVATION_COERCIBLE, MY_REPERTOIRE_ASCII);
@@ -784,7 +784,7 @@ void Item_json_str_multipath::cleanup()
 }
 
 
-bool Item_func_json_extract::fix_length_and_dec()
+bool Item_func_json_extract::fix_length_and_dec(THD *thd)
 {
   collation.set(args[0]->collation);
   max_length= args[0]->max_length * (arg_count - 1);
@@ -1056,14 +1056,14 @@ my_decimal *Item_func_json_extract::val_decimal(my_decimal *to)
 
 
 
-bool Item_func_json_contains::fix_length_and_dec()
+bool Item_func_json_contains::fix_length_and_dec(THD *thd)
 {
   a2_constant= args[1]->const_item();
   a2_parsed= FALSE;
   set_maybe_null();
   if (arg_count > 2)
     path.set_constant_flag(args[2]->const_item());
-  return Item_bool_func::fix_length_and_dec();
+  return Item_bool_func::fix_length_and_dec(thd);
 }
 
 
@@ -1307,13 +1307,13 @@ bool Item_func_json_contains_path::fix_fields(THD *thd, Item **ref)
 }
 
 
-bool Item_func_json_contains_path::fix_length_and_dec()
+bool Item_func_json_contains_path::fix_length_and_dec(THD *thd)
 {
   ooa_constant= args[1]->const_item();
   ooa_parsed= FALSE;
   set_maybe_null();
   mark_constant_paths(paths, args+2, arg_count-2);
-  return Item_bool_func::fix_length_and_dec();
+  return Item_bool_func::fix_length_and_dec(thd);
 }
 
 
@@ -1618,7 +1618,7 @@ append_null:
 }
 
 
-bool Item_func_json_array::fix_length_and_dec()
+bool Item_func_json_array::fix_length_and_dec(THD *thd)
 {
   ulonglong char_length= 2;
   uint n_arg;
@@ -1687,7 +1687,7 @@ err_return:
 }
 
 
-bool Item_func_json_array_append::fix_length_and_dec()
+bool Item_func_json_array_append::fix_length_and_dec(THD *thd)
 {
   uint n_arg;
   ulonglong char_length;
@@ -2617,7 +2617,7 @@ null_return:
 }
 
 
-bool Item_func_json_length::fix_length_and_dec()
+bool Item_func_json_length::fix_length_and_dec(THD *thd)
 {
   if (arg_count > 1)
     path.set_constant_flag(args[1]->const_item());
@@ -2763,7 +2763,7 @@ longlong Item_func_json_depth::val_int()
 }
 
 
-bool Item_func_json_type::fix_length_and_dec()
+bool Item_func_json_type::fix_length_and_dec(THD *thd)
 {
   collation.set(&my_charset_utf8mb3_general_ci);
   max_length= 12;
@@ -2821,7 +2821,7 @@ error:
 }
 
 
-bool Item_func_json_insert::fix_length_and_dec()
+bool Item_func_json_insert::fix_length_and_dec(THD *thd)
 {
   uint n_arg;
   ulonglong char_length;
@@ -3082,7 +3082,7 @@ return_null:
 }
 
 
-bool Item_func_json_remove::fix_length_and_dec()
+bool Item_func_json_remove::fix_length_and_dec(THD *thd)
 {
   collation.set(args[0]->collation);
   max_length= args[0]->max_length;
@@ -3269,7 +3269,7 @@ null_return:
 }
 
 
-bool Item_func_json_keys::fix_length_and_dec()
+bool Item_func_json_keys::fix_length_and_dec(THD *thd)
 {
   collation.set(args[0]->collation);
   max_length= args[0]->max_length;
@@ -3437,7 +3437,7 @@ bool Item_func_json_search::fix_fields(THD *thd, Item **ref)
 
 static const uint SQR_MAX_BLOB_WIDTH= (uint) sqrt(MAX_BLOB_WIDTH);
 
-bool Item_func_json_search::fix_length_and_dec()
+bool Item_func_json_search::fix_length_and_dec(THD *thd)
 {
   collation.set(args[0]->collation);
 
@@ -3637,7 +3637,7 @@ LEX_CSTRING Item_func_json_format::func_name_cstring() const
 }
 
 
-bool Item_func_json_format::fix_length_and_dec()
+bool Item_func_json_format::fix_length_and_dec(THD *thd)
 {
   decimals= 0;
   collation.set(args[0]->collation);
@@ -3983,7 +3983,7 @@ end:
 }
 
 
-bool Item_func_json_normalize::fix_length_and_dec()
+bool Item_func_json_normalize::fix_length_and_dec(THD *thd)
 {
   collation.set(&my_charset_utf8mb4_bin);
   /* 0 becomes 0.0E0, thus one character becomes 5 chars */

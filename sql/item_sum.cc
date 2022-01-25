@@ -1143,7 +1143,7 @@ Item_sum_num::fix_fields(THD *thd, Item **ref)
   result_field=0;
   max_length=float_length(decimals);
   null_value=1;
-  if (fix_length_and_dec() ||
+  if (fix_length_and_dec(thd) ||
       check_sum_func(thd, ref))
     return TRUE;
 
@@ -1169,7 +1169,7 @@ Item_sum_min_max::fix_fields(THD *thd, Item **ref)
 
   /* We should ignore FIELD's in arguments to sum functions */
   with_flags|= (args[0]->with_flags & ~item_with_t::FIELD);
-  if (fix_length_and_dec())
+  if (fix_length_and_dec(thd))
     DBUG_RETURN(TRUE);
 
   if (!is_window_func_sum_expr())
@@ -1245,7 +1245,7 @@ bool Item_sum_hybrid::fix_length_and_dec_string()
 }
 
 
-bool Item_sum_min_max::fix_length_and_dec()
+bool Item_sum_min_max::fix_length_and_dec(THD *thd)
 {
   DBUG_ASSERT(args[0]->field_type() == args[0]->real_item()->field_type());
   DBUG_ASSERT(args[0]->result_type() == args[0]->real_item()->result_type());
@@ -1374,7 +1374,7 @@ Item_sum_sp::fix_fields(THD *thd, Item **ref)
   result_field= NULL;
   max_length= float_length(decimals);
   null_value= 1;
-  if (fix_length_and_dec())
+  if (fix_length_and_dec(thd))
     return TRUE;
 
   if (check_sum_func(thd, ref))
@@ -1461,12 +1461,12 @@ Item_sum_sp::cleanup()
 */
 
 bool
-Item_sum_sp::fix_length_and_dec()
+Item_sum_sp::fix_length_and_dec(THD *thd)
 {
   DBUG_ENTER("Item_sum_sp::fix_length_and_dec");
   DBUG_ASSERT(sp_result_field);
   Type_std_attributes::set(sp_result_field->type_std_attributes());
-  bool res= Item_sum::fix_length_and_dec();
+  bool res= Item_sum::fix_length_and_dec(thd);
   DBUG_RETURN(res);
 }
 
@@ -1562,7 +1562,7 @@ void Item_sum_sum::fix_length_and_dec_decimal()
 }
 
 
-bool Item_sum_sum::fix_length_and_dec()
+bool Item_sum_sum::fix_length_and_dec(THD *thd)
 {
   DBUG_ENTER("Item_sum_sum::fix_length_and_dec");
   set_maybe_null();
@@ -1984,7 +1984,7 @@ void Item_sum_avg::fix_length_and_dec_double()
 }
 
 
-bool Item_sum_avg::fix_length_and_dec()
+bool Item_sum_avg::fix_length_and_dec(THD *thd)
 {
   DBUG_ENTER("Item_sum_avg::fix_length_and_dec");
   prec_increment= current_thd->variables.div_precincrement;
@@ -2216,7 +2216,7 @@ void Item_sum_variance::fix_length_and_dec_decimal()
 }
 
 
-bool Item_sum_variance::fix_length_and_dec()
+bool Item_sum_variance::fix_length_and_dec(THD *thd)
 {
   DBUG_ENTER("Item_sum_variance::fix_length_and_dec");
   set_maybe_null();
@@ -3474,7 +3474,7 @@ my_decimal *Item_sum_udf_int::val_decimal(my_decimal *dec)
 
 /** Default max_length is max argument length. */
 
-bool Item_sum_udf_str::fix_length_and_dec()
+bool Item_sum_udf_str::fix_length_and_dec(THD *thd)
 {
   DBUG_ENTER("Item_sum_udf_str::fix_length_and_dec");
   max_length=0;

@@ -210,7 +210,7 @@ String *Item_func_sha::val_str_ascii(String *str)
   return 0;
 }
 
-bool Item_func_sha::fix_length_and_dec()
+bool Item_func_sha::fix_length_and_dec(THD *thd)
 {
   // size of hex representation of hash
   fix_length_and_charset(MY_SHA1_HASH_SIZE * 2, default_charset());
@@ -290,7 +290,7 @@ String *Item_func_sha2::val_str_ascii(String *str)
 }
 
 
-bool Item_func_sha2::fix_length_and_dec()
+bool Item_func_sha2::fix_length_and_dec(THD *thd)
 {
   set_maybe_null();
   max_length = 0;
@@ -370,7 +370,7 @@ String *Item_aes_crypt::val_str(String *str2)
   return 0;
 }
 
-bool Item_func_aes_encrypt::fix_length_and_dec()
+bool Item_func_aes_encrypt::fix_length_and_dec(THD *thd)
 {
   max_length=my_aes_get_size(MY_AES_ECB, args[0]->max_length);
   what= ENCRYPTION_FLAG_ENCRYPT;
@@ -379,7 +379,7 @@ bool Item_func_aes_encrypt::fix_length_and_dec()
 
 
 
-bool Item_func_aes_decrypt::fix_length_and_dec()
+bool Item_func_aes_decrypt::fix_length_and_dec(THD *thd)
 {
   max_length=args[0]->max_length;
   set_maybe_null();
@@ -388,7 +388,7 @@ bool Item_func_aes_decrypt::fix_length_and_dec()
 }
 
 
-bool Item_func_to_base64::fix_length_and_dec()
+bool Item_func_to_base64::fix_length_and_dec(THD *thd)
 {
   base_flags|= args[0]->base_flags & item_base_t::MAYBE_NULL;
   collation.set(default_charset(), DERIVATION_COERCIBLE, MY_REPERTOIRE_ASCII);
@@ -439,7 +439,7 @@ String *Item_func_to_base64::val_str_ascii(String *str)
 }
 
 
-bool Item_func_from_base64::fix_length_and_dec()
+bool Item_func_from_base64::fix_length_and_dec(THD *thd)
 {
   if (args[0]->max_length > (uint) my_base64_decode_max_arg_length())
   {
@@ -701,7 +701,7 @@ bool Item_func_concat::append_value(THD *thd, String *res, const String *app)
 }
 
 
-bool Item_func_concat::fix_length_and_dec()
+bool Item_func_concat::fix_length_and_dec(THD *thd)
 {
   ulonglong char_length= 0;
 
@@ -1063,7 +1063,7 @@ null:
 }
 
 
-bool Item_func_concat_ws::fix_length_and_dec()
+bool Item_func_concat_ws::fix_length_and_dec(THD *thd)
 {
   ulonglong char_length;
 
@@ -1133,7 +1133,7 @@ String *Item_func_reverse::val_str(String *str)
 }
 
 
-bool Item_func_reverse::fix_length_and_dec()
+bool Item_func_reverse::fix_length_and_dec(THD *thd)
 {
   if (agg_arg_charsets_for_string_result(collation, args, 1))
     return TRUE;
@@ -1292,7 +1292,7 @@ null:
 }
 
 
-bool Item_func_replace::fix_length_and_dec()
+bool Item_func_replace::fix_length_and_dec(THD *thd)
 {
   ulonglong char_length= (ulonglong) args[0]->max_char_length();
   int diff=(int) (args[2]->max_char_length() - 1);
@@ -1319,7 +1319,7 @@ Item_func_sformat::Item_func_sformat(THD *thd, List<Item> &list)
 }
 
 
-bool Item_func_sformat::fix_length_and_dec()
+bool Item_func_sformat::fix_length_and_dec(THD *thd)
 {
   if (!val_arg)
     return TRUE;
@@ -1442,7 +1442,7 @@ String *Item_func_sformat::val_str(String *res)
 }
 
 /*********************************************************************/
-bool Item_func_regexp_replace::fix_length_and_dec()
+bool Item_func_regexp_replace::fix_length_and_dec(THD *thd)
 {
   if (agg_arg_charsets_for_string_result_with_comparison(collation, args, 3))
     return TRUE;
@@ -1580,7 +1580,7 @@ err:
 }
 
 
-bool Item_func_regexp_substr::fix_length_and_dec()
+bool Item_func_regexp_substr::fix_length_and_dec(THD *thd)
 {
   if (agg_arg_charsets_for_string_result_with_comparison(collation, args, 2))
     return TRUE;
@@ -1695,7 +1695,7 @@ null:
 }
 
 
-bool Item_func_insert::fix_length_and_dec()
+bool Item_func_insert::fix_length_and_dec(THD *thd)
 {
   ulonglong char_length;
 
@@ -1728,7 +1728,7 @@ String *Item_str_conv::val_str(String *str)
 }
 
 
-bool Item_func_lcase::fix_length_and_dec()
+bool Item_func_lcase::fix_length_and_dec(THD *thd)
 {
   if (agg_arg_charsets_for_string_result(collation, args, 1))
     return TRUE;
@@ -1739,7 +1739,7 @@ bool Item_func_lcase::fix_length_and_dec()
   return FALSE;
 }
 
-bool Item_func_ucase::fix_length_and_dec()
+bool Item_func_ucase::fix_length_and_dec(THD *thd)
 {
   if (agg_arg_charsets_for_string_result(collation, args, 1))
     return TRUE;
@@ -1787,7 +1787,7 @@ void Item_str_func::left_right_max_length()
 }
 
 
-bool Item_func_left::fix_length_and_dec()
+bool Item_func_left::fix_length_and_dec(THD *thd)
 {
   if (agg_arg_charsets_for_string_result(collation, args, 1))
     return TRUE;
@@ -1823,7 +1823,7 @@ String *Item_func_right::val_str(String *str)
 }
 
 
-bool Item_func_right::fix_length_and_dec()
+bool Item_func_right::fix_length_and_dec(THD *thd)
 {
   if (agg_arg_charsets_for_string_result(collation, args, 1))
     return TRUE;
@@ -1880,7 +1880,7 @@ String *Item_func_substr::val_str(String *str)
 }
 
 
-bool Item_func_substr::fix_length_and_dec()
+bool Item_func_substr::fix_length_and_dec(THD *thd)
 {
   max_length=args[0]->max_length;
 
@@ -1910,7 +1910,7 @@ bool Item_func_substr::fix_length_and_dec()
 }
 
 
-bool Item_func_substr_index::fix_length_and_dec()
+bool Item_func_substr_index::fix_length_and_dec(THD *thd)
 {
   if (agg_arg_charsets_for_string_result_with_comparison(collation, args, 2))
     return TRUE;
@@ -2255,7 +2255,7 @@ String *Item_func_trim::val_str(String *str)
   return trimmed_value(res, (uint32) (ptr - res->ptr()), (uint32) (end - ptr));
 }
 
-bool Item_func_trim::fix_length_and_dec()
+bool Item_func_trim::fix_length_and_dec(THD *thd)
 {
   if (arg_count == 1)
   {
@@ -2449,7 +2449,7 @@ bool Item_func_encode::seed()
   return FALSE;
 }
 
-bool Item_func_encode::fix_length_and_dec()
+bool Item_func_encode::fix_length_and_dec(THD *thd)
 {
   max_length=args[0]->max_length;
   base_flags|= ((args[0]->base_flags | args[1]->base_flags) &
@@ -2625,7 +2625,7 @@ bool Item_func_current_role::fix_fields(THD *thd, Item **ref)
   return 0;
 }
 
-bool Item_func_soundex::fix_length_and_dec()
+bool Item_func_soundex::fix_length_and_dec(THD *thd)
 {
   uint32 char_length= args[0]->max_char_length();
   if (agg_arg_charsets_for_string_result(collation, args, 1))
@@ -2795,7 +2795,7 @@ String *Item_func_soundex::val_str(String *str)
 const int FORMAT_MAX_DECIMALS= 38;
 
 
-bool Item_func_format::fix_length_and_dec()
+bool Item_func_format::fix_length_and_dec(THD *thd)
 {
   uint32 char_length= args[0]->type_handler()->Item_decimal_notation_int_digits(args[0]);
   uint dec= FORMAT_MAX_DECIMALS;
@@ -2942,7 +2942,7 @@ String *Item_func_format::val_str_ascii(String *str)
 }
 
 
-bool Item_func_elt::fix_length_and_dec()
+bool Item_func_elt::fix_length_and_dec(THD *thd)
 {
   uint32 char_length= 0;
   decimals=0;
@@ -3004,7 +3004,7 @@ String *Item_func_elt::val_str(String *str)
 }
 
 
-bool Item_func_make_set::fix_length_and_dec()
+bool Item_func_make_set::fix_length_and_dec(THD *thd)
 {
   uint32 char_length= arg_count - 2; /* Separators */
 
@@ -3167,7 +3167,7 @@ inline String* alloc_buffer(String *res,String *str,String *tmp_value,
 }
 
 
-bool Item_func_repeat::fix_length_and_dec()
+bool Item_func_repeat::fix_length_and_dec(THD *thd)
 {
   if (agg_arg_charsets_for_string_result(collation, args, 1))
     return TRUE;
@@ -3243,7 +3243,7 @@ err:
 }
 
 
-bool Item_func_space::fix_length_and_dec()
+bool Item_func_space::fix_length_and_dec(THD *thd)
 {
   collation.set(default_charset(), DERIVATION_COERCIBLE, MY_REPERTOIRE_ASCII);
   if (args[0]->can_eval_in_optimize())
@@ -3303,7 +3303,7 @@ err:
 }
 
 
-bool Item_func_binlog_gtid_pos::fix_length_and_dec()
+bool Item_func_binlog_gtid_pos::fix_length_and_dec(THD *thd)
 {
   collation.set(system_charset_info);
   max_length= MAX_BLOB_WIDTH;
@@ -3352,7 +3352,7 @@ static String *default_pad_str(String *pad_str, CHARSET_INFO *collation)
   return pad_str;
 }
 
-bool Item_func_pad::fix_length_and_dec()
+bool Item_func_pad::fix_length_and_dec(THD *thd)
 {
   if (arg_count == 3)
   {
@@ -3688,7 +3688,7 @@ String *Item_func_conv_charset::val_str(String *str)
     0 : str;
 }
 
-bool Item_func_conv_charset::fix_length_and_dec()
+bool Item_func_conv_charset::fix_length_and_dec(THD *thd)
 {
   DBUG_ASSERT(collation.derivation == DERIVATION_IMPLICIT);
   fix_char_length(args[0]->max_char_length());
@@ -3714,7 +3714,7 @@ String *Item_func_set_collation::val_str(String *str)
   return str;
 }
 
-bool Item_func_set_collation::fix_length_and_dec()
+bool Item_func_set_collation::fix_length_and_dec(THD *thd)
 {
   if (agg_arg_charsets_for_string_result(collation, args, 1))
     return true;
@@ -3771,7 +3771,7 @@ String *Item_func_collation::val_str(String *str)
 }
 
 
-bool Item_func_weight_string::fix_length_and_dec()
+bool Item_func_weight_string::fix_length_and_dec(THD *thd)
 {
   CHARSET_INFO *cs= args[0]->collation.collation;
   collation.set(&my_charset_bin, args[0]->collation.derivation);
@@ -4161,7 +4161,7 @@ String* Item_func_export_set::val_str(String* str)
   return str;
 }
 
-bool Item_func_export_set::fix_length_and_dec()
+bool Item_func_export_set::fix_length_and_dec(THD *thd)
 {
   uint32 length= MY_MAX(args[1]->max_char_length(), args[2]->max_char_length());
   uint32 sep_length= (arg_count > 3 ? args[3]->max_char_length() : 1);
@@ -4555,7 +4555,7 @@ bool Item_func_dyncol_create::fix_fields(THD *thd, Item **ref)
 }
 
 
-bool Item_func_dyncol_create::fix_length_and_dec()
+bool Item_func_dyncol_create::fix_length_and_dec(THD *thd)
 {
   max_length= MAX_BLOB_WIDTH;
   set_maybe_null();
@@ -5406,7 +5406,7 @@ Item_temptable_rowid::Item_temptable_rowid(TABLE *table_arg)
   max_length= table->file->ref_length;
 }
 
-bool Item_temptable_rowid::fix_length_and_dec()
+bool Item_temptable_rowid::fix_length_and_dec(THD *thd)
 {
   used_tables_cache= table->map;
   const_item_cache= false;
@@ -5672,7 +5672,7 @@ error_exit:
   return nullptr;
 }
 
-bool Item_func_natural_sort_key::fix_length_and_dec(void)
+bool Item_func_natural_sort_key::fix_length_and_dec(THD *thd)
 {
   if (agg_arg_charsets_for_string_result(collation, args, 1))
     return true;
