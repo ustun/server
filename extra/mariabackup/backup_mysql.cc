@@ -83,7 +83,6 @@ os_event_t	kill_query_thread_stop;
 bool sql_thread_started = false;
 char *mysql_slave_position = NULL;
 char *mysql_binlog_position = NULL;
-char *buffer_pool_filename = NULL;
 
 /* History on server */
 time_t history_start_time;
@@ -1375,7 +1374,7 @@ write_current_binlog_file(MYSQL *connection, bool write_binlogs)
 	read_mysql_variables(connection, "SELECT @@GLOBAL.log_bin", log_bin_var, false);
 
 	/* Do not create xtrabackup_binlog_info if binary log is disabled: */
-	if (strcmp(log_bin, "1") != 0) {
+	if (strncmp(log_bin, "1", 2) != 0) {
 		goto binlog_disabled;
 	}
 
@@ -1404,7 +1403,11 @@ write_current_binlog_file(MYSQL *connection, bool write_binlogs)
 			log_bin_dir = strdup(opt_log_bin);
 		} else if (log_bin_dir == NULL) {
 			/* Default location is MySQL datadir */
-			log_bin_dir = strdup("./");
+			log_bin_dir = static_cast<char*>(malloc(3));
+			ut_a(log_bin_dir);
+			log_bin_dir[0] = '.';
+			log_bin_dir[1] = FN_LIBCHAR;
+			log_bin_dir[2] = 0;
 		}
 
 		size_t log_bin_dir_length;
@@ -1413,7 +1416,14 @@ write_current_binlog_file(MYSQL *connection, bool write_binlogs)
 
 		/* strip final slash if it is not the only path component */
 		if (log_bin_dir_length > 1 &&
-		    log_bin_dir[log_bin_dir_length - 1] == FN_LIBCHAR) {
+#ifdef _WIN32
+			(log_bin_dir[log_bin_dir_length - 1] == '/'  ||
+			 log_bin_dir[log_bin_dir_length - 1] == '\\' ||
+			 log_bin_dir[log_bin_dir_length - 1] == ':'))
+#else
+			log_bin_dir[log_bin_dir_length - 1] == FN_LIBCHAR)
+#endif
+		{
 			log_bin_dir[log_bin_dir_length - 1] = 0;
 		}
 
@@ -1953,7 +1963,6 @@ backup_cleanup()
 {
 	free(mysql_slave_position);
 	free(mysql_binlog_position);
-	free(buffer_pool_filename);
 
 	if (mysql_connection) {
 		mysql_close(mysql_connection);

@@ -1593,9 +1593,16 @@ bool backup_finish()
 	/* Copy buffer pool dump or LRU dump */
 	if (!opt_rsync) {
 		if (buffer_pool_filename && file_exists(buffer_pool_filename)) {
-			const char *dst_name;
-
-			dst_name = trim_dotslash(buffer_pool_filename);
+			/* If mariabackup is run for Galera, then the file
+			name is changed to the default so that the receiving
+			node can find this file and rename it according to its
+			settings, otherwise we keep the original file name: */
+			const char *dst_name="ib_buffer_pool";
+			if (!opt_galera_info) {
+				size_t dir_length =
+					dirname_length(buffer_pool_filename);
+				dst_name = buffer_pool_filename + dir_length;
+			}
 			copy_file(ds_data, buffer_pool_filename, dst_name, 0);
 		}
 		if (file_exists("ib_lru_dump")) {
@@ -1684,17 +1691,23 @@ ibx_copy_incremental_over_full()
 
 		/* copy buffer pool dump */
 		if (innobase_buffer_pool_filename) {
-			const char *src_name;
-
-			src_name = trim_dotslash(innobase_buffer_pool_filename);
+			/* If mariabackup is run for Galera, then the file
+			name is changed to the default so that the receiving
+			node can find this file and rename it according to its
+			settings, otherwise we keep the original file name: */
+			const char *src_name = "ib_buffer_pool";
+			if (!opt_galera_info) {
+				size_t dir_length =
+					dirname_length(innobase_buffer_pool_filename);
+				src_name = innobase_buffer_pool_filename + dir_length;
+			}
 
 			snprintf(path, sizeof(path), "%s/%s",
 				xtrabackup_incremental_dir,
 				src_name);
 
 			if (file_exists(path)) {
-				copy_file(ds_data, path,
-					  innobase_buffer_pool_filename, 0);
+				copy_file(ds_data, path, src_name, 0);
 			}
 		}
 
@@ -1929,6 +1942,20 @@ copy_back()
 
 	datadir_node_init(&node);
 
+	/* If mariabackup is run for Galera, then the file
+	name is changed to the default so that the receiving
+	node can find this file and rename it according to its
+	settings, otherwise we keep the original file name: */
+	size_t dir_length;
+	const char *src_buffer_pool;
+	if (opt_galera_info) {
+		dir_length = 0;
+		src_buffer_pool = "ib_buffer_pool";
+	} else {
+		dir_length = dirname_length(buffer_pool_filename);
+		src_buffer_pool = buffer_pool_filename + dir_length;
+	}
+
 	while (datadir_iter_next(it, &node)) {
 		const char *ext_list[] = {"backup-my.cnf",
 			"xtrabackup_binary", "xtrabackup_binlog_info",
@@ -1991,6 +2018,11 @@ copy_back()
 			continue;
 		}
 
+		/* skip buffer pool dump */
+		if (!strcmp(filename, src_buffer_pool)) {
+			continue;
+		}
+
 		/* skip innodb data files */
 		is_ibdata_file = false;
 		for (Tablespace::const_iterator iter(srv_sys_space.begin()),
@@ -2013,23 +2045,26 @@ copy_back()
 
 	/* copy buffer pool dump */
 
-	if (innobase_buffer_pool_filename) {
-		const char *src_name;
-		char path[FN_REFLEN];
-
-		src_name = trim_dotslash(innobase_buffer_pool_filename);
-
-		snprintf(path, sizeof(path), "%s/%s",
-			mysql_data_home,
-			src_name);
-
-		/* could be already copied with other files
-		from data directory */
-		if (file_exists(src_name) &&
-			!file_exists(innobase_buffer_pool_filename)) {
-			copy_or_move_file(src_name,
-					  innobase_buffer_pool_filename,
-					  mysql_data_home, 0);
+	if (file_exists(src_buffer_pool)) {
+		char dst_dir[FN_REFLEN];
+		if (dir_length > 1 &&
+#ifdef _WIN32
+			(buffer_pool_filename[dir_length - 1] == '/'  ||
+			 buffer_pool_filename[dir_length - 1] == '\\' ||
+			 buffer_pool_filename[dir_length - 1] == ':'))
+#else
+			buffer_pool_filename[dir_length - 1] == FN_LIBCHAR)
+#endif
+		{
+			dir_length--;
+		}
+		memcpy(dst_dir, buffer_pool_filename, dir_length);
+		dst_dir[dir_length] = 0;
+		if (!(ret = copy_or_move_file(src_buffer_pool,
+				src_buffer_pool,
+				dst_dir, 1)))
+		{
+			goto cleanup;
 		}
 	}
 
