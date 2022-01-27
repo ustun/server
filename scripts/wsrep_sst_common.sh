@@ -367,12 +367,12 @@ case "$1" in
                                    fi
                                fi
                            fi
-                           if [ $option = 'h' ]; then
+                           if [ "$option" = 'h' ]; then
                                if [ -z "$WSREP_SST_OPT_DATA" ]; then
                                    MYSQLD_OPT_DATADIR=$(trim_dir "$value")
                                fi
-                           elif [ $option != 'u' -a \
-                                  $option != 'P' ]
+                           elif [ "$option" != 'u' -a \
+                                  "$option" != 'P' ]
                            then
                                if [ $cmd_tail -ne 0 ]; then
                                    option="$option --"
@@ -716,7 +716,7 @@ commandex()
 # try to use my_print_defaults, mysql and mysqldump that come
 # with the sources (for MTR suite):
 script_binary=$(dirname "$0")
-SCRIPTS_DIR=$(cd "$script_binary"; pwd -P)
+SCRIPTS_DIR=$(cd "$script_binary"; pwd)
 EXTRA_DIR="$SCRIPTS_DIR/../extra"
 CLIENT_DIR="$SCRIPTS_DIR/../client"
 
@@ -1034,8 +1034,8 @@ wsrep_gen_secret()
         printf '%04x%04x%04x%04x%04x%04x%04x%04x' \
                $RANDOM $RANDOM $RANDOM $RANDOM \
                $RANDOM $RANDOM $RANDOM $RANDOM
-    elif [ -n $(commandex 'cksum') -a \
-           -n $(commandex 'printf') ]
+    elif [ -n "$(commandex cksum)" -a \
+           -n "$(commandex printf)" ]
     then
         printf '%08x%08x%08x%08x' \
             $(head -8 /dev/urandom | cksum | cut -d ' ' -f1) \

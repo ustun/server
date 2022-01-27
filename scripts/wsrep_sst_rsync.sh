@@ -155,7 +155,7 @@ if [ -n "$DATA" -a "$DATA" != '.' ]; then
     [ ! -d "$DATA" ] && mkdir -p "$DATA"
     cd "$DATA"
 fi
-DATA_DIR="$(pwd -P)"
+DATA_DIR="$(pwd)"
 
 cd "$OLD_PWD"
 
@@ -177,7 +177,7 @@ if [ -n "$INNODB_LOG_GROUP_HOME" -a "$INNODB_LOG_GROUP_HOME" != '.' ]; then
     cd "$DATA"
     [ ! -d "$INNODB_LOG_GROUP_HOME" ] && mkdir -p "$INNODB_LOG_GROUP_HOME"
     cd "$INNODB_LOG_GROUP_HOME"
-    ib_log_dir="$(pwd -P)"
+    ib_log_dir="$(pwd)"
     cd "$OLD_PWD"
 fi
 
@@ -193,7 +193,7 @@ if [ -n "$INNODB_DATA_HOME_DIR" -a "$INNODB_DATA_HOME_DIR" != '.' ]; then
     cd "$DATA"
     [ ! -d "$INNODB_DATA_HOME_DIR" ] && mkdir -p "$INNODB_DATA_HOME_DIR"
     cd "$INNODB_DATA_HOME_DIR"
-    ib_home_dir="$(pwd -P)"
+    ib_home_dir="$(pwd)"
     cd "$OLD_PWD"
 fi
 
@@ -209,7 +209,7 @@ if [ -n "$INNODB_UNDO_DIR" -a "$INNODB_UNDO_DIR" != '.' ]; then
     cd "$DATA"
     [ ! -d "$INNODB_UNDO_DIR" ] && mkdir -p "$INNODB_UNDO_DIR"
     cd "$INNODB_UNDO_DIR"
-    ib_undo_dir="$(pwd -P)"
+    ib_undo_dir="$(pwd)"
     cd "$OLD_PWD"
 fi
 
@@ -409,7 +409,7 @@ EOF
                                 else
                                     tar_options="-s '$tar_options'"
                                 fi
-                                eval tar $tar_options \
+                                eval tar -P $tar_options \
                                          -cvf "'$BINLOG_TAR_FILE'" $binlogs >&2
                             fi
                         }
@@ -420,8 +420,13 @@ EOF
                             [ ! -f "$bin_file" ] && continue
                             bin_dir=$(dirname "$bin_file")
                             bin_base=$(basename "$bin_file")
-                            tar $tar_options \
-                                "$BINLOG_TAR_FILE" -C "$bin_dir" "$bin_base"
+                            if [ -n "$bin_dir" -a "$bin_dir" != '.' ]; then
+                                tar $tar_options "$BINLOG_TAR_FILE" \
+                                    -C "$bin_dir" "$bin_base" >&2
+                            else
+                                tar $tar_options "$BINLOG_TAR_FILE" \
+                                    "$bin_base" >&2
+                            fi
                             tar_options='-rvf'
                         done
                     fi
@@ -569,6 +574,8 @@ FILTER="-f '- /lost+found'
         [ -f "$STUNNEL_CONF" ] && rm -f "$STUNNEL_CONF"
         [ -f "$STUNNEL_PID"  ] && rm -f "$STUNNEL_PID"
     fi
+
+    wsrep_log_info "rsync SST/IST completed on donor"
 
 elif [ "$WSREP_SST_OPT_ROLE" = 'joiner' ]
 then
@@ -865,6 +872,8 @@ EOF
         # Output the UUID:seqno and wsrep_gtid_domain_id:
         cat "$MAGIC_FILE"
     fi
+
+    wsrep_log_info "rsync SST/IST completed on joiner"
 
 #   wsrep_cleanup_progress_file
 #   cleanup_joiner

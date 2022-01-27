@@ -149,7 +149,7 @@ get_keys()
         return
     fi
 
-    if [ $sfmt = 'tar' ]; then
+    if [ "$sfmt" = 'tar' ]; then
         wsrep_log_info "NOTE: key-based encryption (encrypt=1)" \
                        "cannot be enabled with tar format"
         encrypt=-1
@@ -228,7 +228,7 @@ get_keys()
 
 get_transfer()
 {
-    if [ $tfmt = 'nc' ]; then
+    if [ "$tfmt" = 'nc' ]; then
         wsrep_log_info "Using netcat as streamer"
         wsrep_check_programs nc
         tcmd='nc'
@@ -869,7 +869,7 @@ if [ -n "$DATA" -a "$DATA" != '.' ]; then
     [ ! -d "$DATA" ] && mkdir -p "$DATA"
     cd "$DATA"
 fi
-DATA_DIR="$(pwd -P)"
+DATA_DIR="$(pwd)"
 
 cd "$OLD_PWD"
 
@@ -1124,6 +1124,7 @@ then
 
     echo "done $WSREP_SST_OPT_GTID"
     wsrep_log_info "Total time on donor: $totime seconds"
+    wsrep_log_info "xtrabackup SST/IST completed on donor"
 
 elif [ "$WSREP_SST_OPT_ROLE" = 'joiner' ]
 then
@@ -1143,7 +1144,7 @@ then
         cd "$DATA"
         [ ! -d "$INNODB_DATA_HOME_DIR" ] && mkdir -p "$INNODB_DATA_HOME_DIR"
         cd "$INNODB_DATA_HOME_DIR"
-        ib_home_dir="$(pwd -P)"
+        ib_home_dir="$(pwd)"
         cd "$OLD_PWD"
     fi
 
@@ -1159,7 +1160,7 @@ then
         cd "$DATA"
         [ ! -d "$INNODB_LOG_GROUP_HOME" ] && mkdir -p "$INNODB_LOG_GROUP_HOME"
         cd "$INNODB_LOG_GROUP_HOME"
-        ib_log_dir="$(pwd -P)"
+        ib_log_dir="$(pwd)"
         cd "$OLD_PWD"
     fi
 
@@ -1175,7 +1176,7 @@ then
         cd "$DATA"
         [ ! -d "$INNODB_UNDO_DIR" ] && mkdir -p "$INNODB_UNDO_DIR"
         cd "$INNODB_UNDO_DIR"
-        ib_undo_dir="$(pwd -P)"
+        ib_undo_dir="$(pwd)"
         cd "$OLD_PWD"
     fi
 
@@ -1299,7 +1300,7 @@ then
                  -d "$binlog_dir" ]
             then
                 cd "$binlog_dir"
-                if [ "$(pwd -P)" != "$DATA_DIR" ]; then
+                if [ "$(pwd)" != "$DATA_DIR" ]; then
                     wsrep_log_info \
                        "Cleaning the binlog directory '$binlog_dir' as well"
                 fi
@@ -1467,6 +1468,7 @@ then
     cat "$MAGIC_FILE" # Output : UUID:seqno wsrep_gtid_domain_id
 
     wsrep_log_info "Total time on joiner: $totime seconds"
+    wsrep_log_info "xtrabackup SST/IST completed on joiner"
 fi
 
 exit 0
