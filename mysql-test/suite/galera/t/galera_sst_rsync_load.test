@@ -1,0 +1,57 @@
+--source include/big_test.inc
+--source include/galera_cluster.inc
+
+--let $node_1=node_1
+--let $node_2=node_2
+--source include/auto_increment_offset_save.inc
+
+--connection node_1
+CREATE TABLE t1(id int not null primary key auto_increment,
+b int, c int, d char(255), key (b)) engine=innodb;
+
+--connection node_2
+--echo Shutting down server ...
+--source include/shutdown_mysqld.inc
+# force SST
+--remove_file $MYSQLTEST_VARDIR/mysqld.2/data/grastate.dat
+
+--connection node_1
+--let $wait_condition = SELECT VARIABLE_VALUE = 1 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size'
+--source include/wait_condition.inc
+SET GLOBAL innodb_max_dirty_pages_pct=99;
+SET GLOBAL innodb_max_dirty_pages_pct_lwm=99;
+delimiter //;
+create procedure innodb_insert_proc (repeat_count int)
+begin
+  declare current_num int;
+  set current_num = 0;
+  while current_num < repeat_count do
+    insert into t1 values (NULL,current_num,current_num, substring(MD5(RAND()), -200));
+    update t1 set b = current_num +100,
+              d =  substring(MD5(RAND()), -200)
+       where b = current_num;
+    set current_num = current_num + 1;
+  end while;
+end//
+delimiter ;//
+commit;
+
+SET autocommit=0;
+call innodb_insert_proc(7000);
+COMMIT;
+
+SELECT variable_value FROM information_schema.global_status
+WHERE variable_name = 'INNODB_BUFFER_POOL_PAGES_DIRTY';
+
+--connection node_2
+--echo Starting server ...
+--source include/start_mysqld.inc
+
+--let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size'
+--source include/wait_condition.inc
+
+SELECT COUNT(*) FROM t1;
+
+CHECK TABLE t1;
+DROP PROCEDURE innodb_insert_proc;
+DROP TABLE t1;
