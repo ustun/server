@@ -47,6 +47,8 @@ void report_path_error_ex(const char *ps, json_path_t *p,
 void report_json_error_ex(const char *js, json_engine_t *je,
                           const char *fname, int n_param,
                           Sql_condition::enum_warning_level lv);
+bool json_compare_whole(json_engine_t *js, json_engine_t *value);
+
 
 class Json_engine_scan: public json_engine_t
 {
@@ -760,5 +762,24 @@ public:
   { return get_item_copy<Item_func_json_objectagg>(thd, this); }
 };
 
+
+class Item_func_json_overlaps: public Item_bool_func
+{
+  String tmp_js;
+  bool a2_constant, a2_parsed;
+  String tmp_val, *val;
+public:
+  Item_func_json_overlaps(THD *thd, List<Item> &list):
+    Item_bool_func(thd, list) {}
+  LEX_CSTRING func_name_cstring() const override
+  {
+    static LEX_CSTRING name= {STRING_WITH_LEN("json_overlaps") };
+    return name;
+  }
+  bool fix_length_and_dec() override;
+  longlong val_int() override;
+  Item *get_copy(THD *thd) override
+  { return get_item_copy<Item_func_json_overlaps>(thd, this); }
+};
 
 #endif /* ITEM_JSONFUNC_INCLUDED */

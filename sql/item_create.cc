@@ -1292,6 +1292,19 @@ protected:
 };
 
 
+class Create_func_json_overlaps: public Create_native_func
+{
+public:
+  virtual Item *create_native(THD *thd, LEX_CSTRING *name, List<Item> *item_list);
+
+  static Create_func_json_overlaps s_singleton;
+
+protected:
+  Create_func_json_overlaps() {}
+  virtual ~Create_func_json_overlaps() {}
+};
+
+
 class Create_func_last_day : public Create_func_arg1
 {
 public:
@@ -4249,6 +4262,28 @@ Create_func_json_search::create_native(THD *thd, LEX_CSTRING *name,
 }
 
 
+Create_func_json_overlaps Create_func_json_overlaps::s_singleton;
+
+Item*
+Create_func_json_overlaps::create_native(THD *thd, LEX_CSTRING *name,
+                                         List<Item> *item_list)
+{
+  Item *func= NULL;
+  int arg_count= 0;
+
+  if (item_list != NULL)
+    arg_count= item_list->elements;
+
+  if (unlikely(arg_count == 2/* json_doc, json_doc */))
+    func= new (thd->mem_root) Item_func_json_overlaps(thd, *item_list);
+  else
+    my_error(ER_WRONG_PARAMCOUNT_TO_NATIVE_FCT, MYF(0), name->str);
+
+  status_var_increment(thd->status_var.feature_json);
+  return func;
+}
+
+
 Create_func_last_insert_id Create_func_last_insert_id::s_singleton;
 
 Item*
@@ -5667,6 +5702,7 @@ Native_func_registry func_array[] =
   { { STRING_WITH_LEN("JSON_QUERY") }, BUILDER(Create_func_json_query)},
   { { STRING_WITH_LEN("JSON_QUOTE") }, BUILDER(Create_func_json_quote)},
   { { STRING_WITH_LEN("JSON_OBJECT") }, BUILDER(Create_func_json_object)},
+  { { STRING_WITH_LEN("JSON_OVERLAPS") }, BUILDER(Create_func_json_overlaps)},
   { { STRING_WITH_LEN("JSON_REMOVE") }, BUILDER(Create_func_json_remove)},
   { { STRING_WITH_LEN("JSON_REPLACE") }, BUILDER(Create_func_json_replace)},
   { { STRING_WITH_LEN("JSON_SET") }, BUILDER(Create_func_json_set)},
