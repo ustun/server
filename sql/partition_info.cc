@@ -1023,6 +1023,8 @@ bool vers_create_partitions(THD *thd, TABLE_LIST* tl, uint num_parts)
   // NOTE: we have to return DA_EMPTY for new command
   DBUG_ASSERT(thd->get_stmt_da()->is_ok());
   thd->get_stmt_da()->reset_diagnostics_area();
+  thd->variables.option_bits|= OPTION_KEEP_LOG;
+  thd->log_current_statement= true;
 
 exit:
   thd->work_part_info= save_part_info;

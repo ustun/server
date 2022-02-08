@@ -1207,6 +1207,7 @@ values_loop_end:
 
     if (error <= 0 ||
         thd->transaction->stmt.modified_non_trans_table ||
+        thd->log_current_statement ||
 	was_insert_delayed)
     {
       if(WSREP_EMULATE_BINLOG(thd) || mysql_bin_log.is_open())
@@ -1229,8 +1230,8 @@ values_loop_end:
         else
           errcode= query_error_code(thd, thd->killed == NOT_KILLED);
 
-        ScopedStatementReplication scoped_stmt_rpl(
-            table->versioned(VERS_TRX_ID) ? thd : NULL);
+        StatementBinlog stmt_binlog(thd, table->versioned(VERS_TRX_ID) ||
+                                         thd->binlog_need_stmt_format(transactional_table));
        /* bug#22725:
 
 	A query which per-row-loop can not be interrupted with
