@@ -1418,7 +1418,7 @@ write_current_binlog_file(MYSQL *connection, bool write_binlogs)
 		while (IS_TRAILING_SLASH(log_bin_dir, log_bin_dir_length)) {
 			log_bin_dir_length--;
 		}
-		log_bin_dir[log_bin_dir_length - 1] = 0;
+		log_bin_dir[log_bin_dir_length] = 0;
 
 		if (log_bin_dir == NULL) {
 			msg("Failed to locate binary log files");
