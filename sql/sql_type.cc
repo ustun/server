@@ -2751,7 +2751,7 @@ Type_handler_string::Column_definition_set_attributes(
                                                  const
 {
   Type_handler::Column_definition_set_attributes(thd, def, attr, cs, type);
-  if (attr.length())
+  if (attr.has_explicit_length())
     return false;
   switch (type) {
   case COLUMN_DEFINITION_ROUTINE_PARAM:
@@ -2783,7 +2783,7 @@ Type_handler_varchar::Column_definition_set_attributes(
                                                  const
 {
   Type_handler::Column_definition_set_attributes(thd, def, attr, cs, type);
-  if (attr.length())
+  if (attr.has_explicit_length())
     return false;
   switch (type) {
   case COLUMN_DEFINITION_ROUTINE_PARAM:
