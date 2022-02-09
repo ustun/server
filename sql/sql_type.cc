@@ -2713,11 +2713,10 @@ bool
 Type_handler::Column_definition_set_attributes(THD *thd,
                                                Column_definition *def,
                                                const Lex_field_type_st &attr,
-                                               CHARSET_INFO *cs,
                                                column_definition_type_t type)
                                                const
 {
-  def->charset= cs;
+  def->set_lex_collation(attr.lex_collation());
   def->set_length_and_dec(attr);
   return false;
 }
@@ -2746,11 +2745,10 @@ Type_handler_string::Column_definition_set_attributes(
                                                  THD *thd,
                                                  Column_definition *def,
                                                  const Lex_field_type_st &attr,
-                                                 CHARSET_INFO *cs,
                                                  column_definition_type_t type)
                                                  const
 {
-  Type_handler::Column_definition_set_attributes(thd, def, attr, cs, type);
+  Type_handler::Column_definition_set_attributes(thd, def, attr, type);
   if (attr.has_explicit_length())
     return false;
   switch (type) {
@@ -2778,11 +2776,10 @@ Type_handler_varchar::Column_definition_set_attributes(
                                                  THD *thd,
                                                  Column_definition *def,
                                                  const Lex_field_type_st &attr,
-                                                 CHARSET_INFO *cs,
                                                  column_definition_type_t type)
                                                  const
 {
-  Type_handler::Column_definition_set_attributes(thd, def, attr, cs, type);
+  Type_handler::Column_definition_set_attributes(thd, def, attr, type);
   if (attr.has_explicit_length())
     return false;
   switch (type) {
@@ -4267,10 +4264,9 @@ Type_handler_timestamp_common::
 Column_definition_set_attributes(THD *thd,
                                  Column_definition *def,
                                  const Lex_field_type_st &attr,
-                                 CHARSET_INFO *cs,
                                  column_definition_type_t type) const
 {
-  Type_handler::Column_definition_set_attributes(thd, def, attr, cs, type);
+  Type_handler::Column_definition_set_attributes(thd, def, attr, type);
   if (!opt_explicit_defaults_for_timestamp)
     def->flags|= NOT_NULL_FLAG;
   return false;

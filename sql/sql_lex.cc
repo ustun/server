@@ -543,36 +543,10 @@ bool LEX::add_alter_list(LEX_CSTRING name, LEX_CSTRING new_name, bool exists)
 
 
 void LEX::init_last_field(Column_definition *field,
-                          const LEX_CSTRING *field_name,
-                          const CHARSET_INFO *cs)
+                          const LEX_CSTRING *field_name)
 {
   last_field= field;
-
   field->field_name= *field_name;
-
-  /* reset LEX fields that are used in Create_field::set_and_check() */
-  charset= cs;
-}
-
-
-bool LEX::set_bincmp(CHARSET_INFO *cs, bool bin)
-{
-  /*
-     if charset is NULL - we're parsing a field declaration.
-     we cannot call find_bin_collation for a field here, because actual
-     field charset is determined in get_sql_field_charset() much later.
-     so we only set a flag.
-  */
-  if (!charset)
-  {
-    charset= cs;
-    last_field->flags|= bin ? BINCMP_FLAG : 0;
-    return false;
-  }
-
-  charset= bin ? find_bin_collation(cs ? cs : charset)
-               :                    cs ? cs : charset;
-  return charset == NULL;
 }
 
 
@@ -6371,8 +6345,7 @@ sp_variable *LEX::sp_param_init(LEX_CSTRING *name)
     return NULL;
   }
   sp_variable *spvar= spcont->add_variable(thd, name);
-  init_last_field(&spvar->field_def, name,
-                  thd->variables.collation_database);
+  init_last_field(&spvar->field_def, name);
   return spvar;
 }
 
@@ -6381,8 +6354,7 @@ bool LEX::sp_param_fill_definition(sp_variable *spvar,
                                    const Lex_field_type_st &def)
 {
   return
-    last_field->set_attributes(thd, def, charset,
-                               COLUMN_DEFINITION_ROUTINE_PARAM) ||
+    last_field->set_attributes(thd, def, COLUMN_DEFINITION_ROUTINE_PARAM) ||
     sphead->fill_spvar_definition(thd, last_field, &spvar->name);
 }
 
@@ -6390,8 +6362,7 @@ bool LEX::sp_param_fill_definition(sp_variable *spvar,
 bool LEX::sf_return_fill_definition(const Lex_field_type_st &def)
 {
   return
-    last_field->set_attributes(thd, def, charset,
-                               COLUMN_DEFINITION_FUNCTION_RETURN) ||
+    last_field->set_attributes(thd, def, COLUMN_DEFINITION_FUNCTION_RETURN) ||
     sphead->fill_field_definition(thd, last_field);
 }
 
@@ -6471,8 +6442,7 @@ void LEX::sp_variable_declarations_init(THD *thd, int nvars)
 
   sphead->reset_lex(thd);
   spcont->declare_var_boundary(nvars);
-  thd->lex->init_last_field(&spvar->field_def, &spvar->name,
-                            thd->variables.collation_database);
+  thd->lex->init_last_field(&spvar->field_def, &spvar->name);
 }
 
 
@@ -11444,16 +11414,15 @@ Spvar_definition *LEX::row_field_name(THD *thd, const Lex_ident_sys_st &name)
   }
   if (unlikely(!(res= new (thd->mem_root) Spvar_definition())))
     return NULL;
-  init_last_field(res, &name, thd->variables.collation_database);
+  init_last_field(res, &name);
   return res;
 }
 
 
 Item *
-Lex_cast_type_st::create_typecast_item_or_error(THD *thd, Item *item,
-                                                CHARSET_INFO *cs) const
+Lex_cast_type_st::create_typecast_item_or_error(THD *thd, Item *item) const
 {
-  Item *tmp= create_typecast_item(thd, item, cs);
+  Item *tmp= create_typecast_item(thd, item);
   if (!tmp)
   {
     Name name= m_type_handler->name();
@@ -11471,6 +11440,7 @@ bool
 Lex_length_and_dec_st::set(const char *plength, const char *pdec)
 {
   m_length= m_dec= 0;
+  m_collation_type= 0;
   if ((m_has_explicit_length= (plength != nullptr)))
   {
     int err;
@@ -11517,8 +11487,7 @@ bool LEX::set_field_type_udt(Lex_field_type_st *type,
   const Type_handler *h;
   if (!(h= Type_handler::handler_by_name_or_error(thd, name)))
     return true;
-  type->set(h, attr);
-  charset= &my_charset_bin;
+  type->set(h, attr, &my_charset_bin);
   return false;
 }
 
@@ -11530,7 +11499,6 @@ bool LEX::set_cast_type_udt(Lex_cast_type_st *type,
   if (!(h= Type_handler::handler_by_name_or_error(thd, name)))
     return true;
   type->set(h);
-  charset= NULL;
   return false;
 }
 
@@ -11815,4 +11783,258 @@ bool SELECT_LEX_UNIT::explainable() const
              derived ?
                derived->is_materialized_derived() :   // (3)
                false;
+}
+
+
+bool Lex_collation_st::set_charset_collate_explicit(CHARSET_INFO *cs,
+                                                    CHARSET_INFO *cl)
+{
+  DBUG_ASSERT(cs != nullptr && cl != nullptr);
+  if (!my_charset_same(cl, cs))
+  {
+    my_error(ER_COLLATION_CHARSET_MISMATCH, MYF(0),
+             cl->coll_name.str, cs->cs_name.str);
+    return true;
+  }
+  m_collation= cl;
+  m_type= TYPE_EXPLICIT;
+  return false;
+}
+
+
+/** find a collation with binary comparison rules
+*/
+CHARSET_INFO *Lex_collation_st::find_bin_collation(CHARSET_INFO *cs)
+{
+  /*
+    We don't need to handle old_mode=UTF8_IS_UTF8MB3 here,
+    because "cs" points to a real character set name.
+    It can be either "utf8mb3" or "utf8mb4". It cannot be "utf8".
+    No thd->get_utf8_flag() flag passed to get_charset_by_csname().
+  */
+  DBUG_ASSERT(cs->cs_name.length !=4 || memcmp(cs->cs_name.str, "utf8", 4));
+  /*
+    CREATE TABLE t1 (a CHAR(10) BINARY)
+      CHARACTER SET utf8mb4 COLLATE utf8mb4_bin;
+    Nothing to do, we have the binary collation already.
+  */
+  if (cs->state & MY_CS_BINSORT)
+    return cs;
+
+  // CREATE TABLE t1 (a CHAR(10) BINARY) CHARACTER SET utf8mb4;/
+  if (!(cs= get_charset_by_csname(cs->cs_name.str, MY_CS_BINSORT, MYF(0))))
+  {
+    char tmp[65];
+    strxnmov(tmp, sizeof(tmp)-1, cs->cs_name.str, "_bin", NULL);
+    my_error(ER_UNKNOWN_COLLATION, MYF(0), tmp);
+  }
+  return cs;
+}
+
+
+CHARSET_INFO *Lex_collation_st::find_default_collation(CHARSET_INFO *cs)
+{
+  // See comments in find_bin_collation()
+  DBUG_ASSERT(cs->cs_name.length !=4 || memcmp(cs->cs_name.str, "utf8", 4));
+  /*
+    CREATE TABLE t1 (a CHAR(10) COLLATE DEFAULT) CHARACTER SET utf8mb4;
+    Nothing to do, we have the default collation already.
+  */
+  if (cs->state & MY_CS_PRIMARY)
+    return cs;
+  /*
+    CREATE TABLE t1 (a CHAR(10) COLLATE DEFAULT)
+      CHARACTER SET utf8mb4 COLLATE utf8mb4_bin;
+
+    Don't need to handle old_mode=UTF8_IS_UTF8MB3 here.
+    See comments in find_bin_collation.
+  */
+  cs= get_charset_by_csname(cs->cs_name.str, MY_CS_PRIMARY, MYF(MY_WME));
+  /*
+    The above should never fail, as we have default collations for
+    all character sets.
+  */
+  DBUG_ASSERT(cs);
+  return cs;
+}
+
+
+/*
+  Resolve an empty or a contextually typed collation according to the
+  upper level default character set (and optionally a collation), e.g.:
+    CREATE TABLE t1 (a CHAR(10)) CHARACTER SET latin1;
+    CREATE TABLE t1 (a CHAR(10) BINARY) CHARACTER SET latin1;
+    CREATE TABLE t1 (a CHAR(10) COLLATE DEFAULT)
+      CHARACTER SET latin1 COLLATE latin1_bin;
+
+  "this" is the COLLATE clause                  (e.g. of a column)
+  "def" is the upper level CHARACTER SET clause (e.g. of a table)
+*/
+CHARSET_INFO *
+Lex_collation_st::resolved_to_character_set(CHARSET_INFO *def) const
+{
+  DBUG_ASSERT(def);
+  if (m_type != TYPE_CONTEXTUALLY_TYPED)
+  {
+    if (!m_collation)
+      return def;       // Empty - not typed at all
+    return m_collation; // Explicitly typed
+  }
+
+  // Contextually typed
+  DBUG_ASSERT(m_collation);
+
+  if (m_collation == &my_charset_bin)    // CHAR(10) BINARY
+    return find_bin_collation(def);
+
+  if (m_collation == &my_charset_latin1) // CHAR(10) COLLATE DEFAULT
+    return find_default_collation(def);
+
+  /*
+    Non-binary and non-default contextually typed collation.
+    We don't have such yet - the parser cannot produce this.
+    But will have soon, e.g. "uca1400_as_ci".
+  */
+  DBUG_ASSERT(0);
+  return NULL;
+}
+
+
+/*
+  Merge the CHARACTER SET clause to:
+  - an empty COLLATE clause
+  - an explicitly typed collation name
+  - a contextually typed collation
+
+  "this" corresponds to `CHARACTER SET xxx [BINARY]`
+  "cl" corresponds to the COLLATE clause
+*/
+bool Lex_collation_st::
+       merge_charset_clause_and_collate_clause(const Lex_collation_st &cl)
+{
+  if (!cl.collation()) // No COLLATE clause
+    return false;
+
+  if (!collation()) // No CHARACTER SET clause
+  {
+    /*
+      CHAR(10) NOT NULL COLLATE latin1_bin
+      CHAR(10) NOT NULL COLLATE DEFAULT
+    */
+    *this= cl;
+    return false;
+  }
+
+  if (is_contextually_typed_collation())
+  {
+    if (cl.is_contextually_typed_collation())
+    {
+      /*
+        CONTEXT + CONTEXT:
+        CHAR(10) BINARY .. COLLATE DEFAULT - not supported by the parser
+        CHAR(10) BINARY .. COLLATE uca1400_as_ci - not supported yet
+      */
+      DBUG_ASSERT(0); // Not possible yet
+      return false;
+    }
+
+    /*
+      CONTEXT + EXPLICIT
+      CHAR(10) COLLATE DEFAULT       .. COLLATE latin1_swedish_ci
+      CHAR(10) BINARY                .. COLLATE latin1_bin
+      CHAR(10) COLLATE uca1400_as_ci .. COLLATE latin1_bin
+    */
+    if (collation() == &my_charset_latin1 &&
+        !(cl.collation()->state & MY_CS_PRIMARY))
+    {
+      my_error(ER_CONFLICTING_DECLARATIONS, MYF(0),
+               "COLLATE ", "DEFAULT", "COLLATE ",
+               cl.collation()->coll_name.str);
+      return true;
+    }
+    if (collation() == &my_charset_bin &&
+        !(cl.collation()->state & MY_CS_BINSORT))
+    {
+      my_error(ER_CONFLICTING_DECLARATIONS, MYF(0),
+               "", "BINARY", "COLLATE ", cl.collation()->coll_name.str);
+      return true;
+    }
+    *this= cl;
+    return false;
+  }
+
+  if (cl.is_contextually_typed_collation())
+  {
+    /*
+      EXPLICIT + CONTEXT
+      CHAR(10) COLLATE latin1_bin .. COLLATE DEFAULT       - not supported
+      CHAR(10) COLLATE latin1_bin .. COLLATE uca1400_as_ci - not yet
+    */
+    DBUG_ASSERT(0); // Not possible yet
+    return false;
+  }
+
+  /*
+    EXPLICIT + EXPLICIT
+    CHAR(10) CHARACTER SET latin1                    .. COLLATE latin1_bin
+    CHAR(10) CHARACTER SET latin1 COLLATE latin1_bin .. COLLATE latin1_bin
+    CHAR(10) COLLATE latin1_bin                      .. COLLATE latin1_bin
+    CHAR(10) COLLATE latin1_bin                      .. COLLATE latin1_bin
+    CHAR(10) CHARACTER SET latin1 BINARY             .. COLLATE latin1_bin
+  */
+  if (type() == TYPE_EXPLICIT && collation() != cl.collation())
+  {
+    my_error(ER_CONFLICTING_DECLARATIONS, MYF(0),
+             "COLLATE ", collation()->coll_name.str,
+             "COLLATE ", cl.collation()->coll_name.str);
+    return true;
+  }
+  if (!my_charset_same(collation(), cl.collation()))
+  {
+    my_error(ER_COLLATION_CHARSET_MISMATCH, MYF(0),
+             cl.collation()->coll_name.str, collation()->cs_name.str);
+    return true;
+  }
+  *this= cl;
+  return false;
+}
+
+
+/*
+  This method is used in the "attribute_list" rule to merge two indepentent
+  COLLATE clauses (not belonging to a CHARACTER SET clause).
+*/
+bool Lex_collation_st::
+       merge_collate_clause_and_collate_clause(const Lex_collation_st &cl)
+{
+  /*
+    We don't have contextually typed independent COLLATE clauses yet.
+    But we'll have soon: COLLATE uca1400_as_ci.
+  */
+  DBUG_ASSERT(!is_contextually_typed_collation());
+  DBUG_ASSERT(!cl.is_contextually_typed_collation());
+
+  if (!cl.collation())
+    return false;
+
+  if (!collation())
+  {
+    *this= cl;
+    return false;
+  }
+
+  /*
+    Two independent explicit collations:
+      CHAR(10) NOT NULL COLLATE latin1_bin DEFAULT 'a' COLLATE latin1_bin
+    Note, we should perhaps eventually disallow double COLLATE clauses.
+    But for now let's just disallow only conflicting ones.
+  */
+  if (collation() != cl.collation())
+  {
+    my_error(ER_CONFLICTING_DECLARATIONS, MYF(0),
+             "COLLATE ", collation()->coll_name.str,
+             "COLLATE ", cl.collation()->coll_name.str);
+    return true;
+  }
+  return false;
 }

@@ -5299,7 +5299,6 @@ public:
   Column_definition(THD *thd, Field *field, Field *orig_field);
   bool set_attributes(THD *thd,
                       const Lex_field_type_st &attr,
-                      CHARSET_INFO *cs,
                       column_definition_type_t type);
   void create_length_to_internal_length_null()
   {
@@ -5493,6 +5492,22 @@ public:
   { return compression_method_ptr; }
 
   bool check_vcol_for_key(THD *thd) const;
+
+  void set_lex_collation(const Lex_collation_st &lc)
+  {
+    charset= lc.collation();
+    if (lc.is_contextually_typed_collation())
+      flags|= BINCMP_FLAG;
+    else
+      flags&= ~BINCMP_FLAG;
+  }
+  Lex_collation lex_collation() const
+  {
+    return Lex_collation(charset,
+                         flags & BINCMP_FLAG ?
+                         Lex_collation_st::TYPE_CONTEXTUALLY_TYPED :
+                         Lex_collation_st::TYPE_IMPLICIT);
+  }
 };
 
 
