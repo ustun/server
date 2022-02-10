@@ -352,6 +352,15 @@ class Master_info : public Slave_reporting_capability
     ACK from slave, or if delay_master is enabled.
   */
   int semi_ack;
+  /*
+    The flag has replicate_same_server_id semantics and is raised to accept
+    a same-server-id event group on the semisync slave.
+    Such situation can appear as result of this server crash-recovery. The event
+    group was created there and replicated elsewhere right before the crash
+    that took place before the group's transaction commit.
+    At recovery the transaction gets evicted from the server's binlog.
+  */
+  bool do_accept_own_server_id;
 };
 
 int init_master_info(Master_info* mi, const char* master_info_fname,
