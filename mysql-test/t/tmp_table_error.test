@@ -5,8 +5,7 @@ create table t1 (
   b text
 ) engine=innodb;
 
---replace_regex /'.*'/'tmp'/
---error 126
+--error ER_GET_ERRNO
 create table t2 as
 select
     1

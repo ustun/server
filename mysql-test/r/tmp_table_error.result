@@ -2630,5 +2630,5 @@ b as c2624,
 b as c2626
 from t1
 ) as tt1;
-ERROR HY000: Index for table 'tmp' is corrupt; try to repair it
+ERROR HY000: Got error 139 "Too big row" from storage engine Aria
 drop table t1;

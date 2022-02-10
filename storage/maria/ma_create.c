@@ -789,6 +789,12 @@ int maria_create(const char *name, enum data_file_type datafile_type,
   share.base.fields= columns;
   share.base.pack_fields= packed;
 
+  if (share.base.keystart > 65535)
+  {
+    my_errno= HA_ERR_TO_BIG_ROW;
+    goto err_no_lock;
+  }
+
   if (share.data_file_type == BLOCK_RECORD)
   {
     /*
